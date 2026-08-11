@@ -112,9 +112,9 @@ TOOL_CSS = """
 .presets button{font-family:var(--mono);font-size:11px;border:1px solid var(--line);background:transparent;color:var(--ink-2);
   border-radius:6px;padding:3px 8px;cursor:pointer}
 .presets button:hover{border-color:var(--teal);color:var(--teal)}
-.agwrap{display:flex;gap:12px;align-items:stretch;margin:6px 0 14px}
-#agc{background:var(--paper);border:1px solid var(--line);border-radius:8px;flex:none;max-width:100%}
-.sliders{display:flex;gap:2px;flex:1;justify-content:space-between}
+.agwrap{display:flex;flex-direction:column;gap:12px;margin:6px 0 14px}
+#agc{background:var(--paper);border:1px solid var(--line);border-radius:8px;width:100%;height:auto}
+.sliders{display:flex;gap:2px;justify-content:space-between;padding:0 2px}
 .sl{display:flex;flex-direction:column;align-items:center;gap:5px;font-family:var(--mono);font-size:9px;color:var(--muted)}
 .sl input[type=range]{-webkit-appearance:slider-vertical;writing-mode:vertical-lr;direction:rtl;width:18px;height:110px;accent-color:var(--teal)}
 .sl .slv{color:var(--ink-2);font-weight:600}
