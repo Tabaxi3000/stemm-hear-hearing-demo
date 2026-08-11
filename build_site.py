@@ -97,6 +97,85 @@ RAIL_SUB = "\n".join(f'<a href="#st-{s["id"]}" data-spy="st-{s["id"]}"><span>&#9
 RAIL_SHAPE = "\n".join(f'<a href="#st-{s["id"]}" data-spy="st-{s["id"]}"><span>{i+1:02d}</span>{html.escape(s["name"])}</a>'
                        for i, s in enumerate(A["audiograms"]))
 
+DSP_JS = open(os.path.join(HERE, "dsp.js")).read()
+TOOL_JS = open(os.path.join(HERE, "tool.js")).read()
+
+TOOL_CSS = """
+.tool{padding:34px 0 40px;border-top:1px solid var(--line)}
+.tool-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:22px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--sh)}
+.filebtn{display:inline-block;font-family:var(--mono);font-size:13px;font-weight:600;color:#fff;background:var(--teal);
+  border-radius:9px;padding:8px 14px;cursor:pointer;transition:transform .06s}
+.filebtn:hover{transform:translateY(-1px)} .filebtn input{display:none}
+.fname{font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:10px}
+.presets{font-size:11px;color:var(--muted);margin:16px 0 8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-family:var(--mono)}
+.presets button{font-family:var(--mono);font-size:11px;border:1px solid var(--line);background:transparent;color:var(--ink-2);
+  border-radius:6px;padding:3px 8px;cursor:pointer}
+.presets button:hover{border-color:var(--teal);color:var(--teal)}
+.agwrap{display:flex;gap:12px;align-items:stretch;margin:6px 0 14px}
+#agc{background:var(--paper);border:1px solid var(--line);border-radius:8px;flex:none;max-width:100%}
+.sliders{display:flex;gap:2px;flex:1;justify-content:space-between}
+.sl{display:flex;flex-direction:column;align-items:center;gap:5px;font-family:var(--mono);font-size:9px;color:var(--muted)}
+.sl input[type=range]{-webkit-appearance:slider-vertical;writing-mode:vertical-lr;direction:rtl;width:18px;height:110px;accent-color:var(--teal)}
+.sl .slv{color:var(--ink-2);font-weight:600}
+.rowctl{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted);margin:6px 0 16px;font-family:var(--mono)}
+.rowctl input[type=range]{flex:1;accent-color:var(--teal)}
+.runbtn{font-family:var(--mono);font-weight:600;font-size:14px;color:#fff;background:var(--teal);border:none;
+  border-radius:10px;padding:10px 22px;cursor:pointer;transition:transform .06s}
+.runbtn:hover{transform:translateY(-1px)} .runbtn:disabled{opacity:.45;cursor:default;transform:none}
+.status{font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:12px}
+#tchips .chip:disabled{opacity:.45;cursor:default}
+.dlrow{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:16px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.dl{color:var(--teal);text-decoration:none;border-bottom:1px solid color-mix(in srgb,var(--teal) 40%,transparent);cursor:pointer}
+@media (max-width:560px){.tool-grid{grid-template-columns:1fr}.agwrap{flex-direction:column}}
+"""
+
+TOOL_HTML = f"""
+    <p class="band-label">Interactive &mdash; run the pipeline on your own audio</p>
+    <section class="tool" id="tool">
+      <div class="sp-head"><span class="sp-num sub">&#9881;</span>
+        <div class="sp-title"><h2>Try your own <span class="kind">upload · in-browser · approximate</span></h2>
+        <p class="sp-blurb">Upload a WAV or MP3, set an audiogram, and hear it re-synthesised &mdash; Original vs
+        Static vs WDRC. Everything runs in your browser (nothing is uploaded); it's a JavaScript port of the
+        pipeline, so it's approximate, not identical to the Colab notebook.</p></div></div>
+      <div class="tool-grid">
+        <div class="panel">
+          <label class="filebtn">Choose audio<input type="file" id="tf" accept="audio/*"></label>
+          <span id="fname" class="fname">no file chosen yet</span>
+          <div class="presets">audiogram:
+            <button data-preset="normal">normal</button><button data-preset="sloping">sloping</button>
+            <button data-preset="flat">flat 40</button><button data-preset="ski">ski-slope</button></div>
+          <div class="agwrap"><canvas id="agc" width="290" height="170"></canvas>
+            <div class="sliders" id="sliders"></div></div>
+          <div class="rowctl"><label for="rel">WDRC release</label>
+            <input type="range" id="rel" min="20" max="600" step="10" value="150"><span id="relv">150 ms</span></div>
+          <button id="run" class="runbtn" disabled>Process</button>
+          <span id="tstatus" class="status">pick an audio file to start</span>
+        </div>
+        <div class="panel">
+          <div class="chips" id="tchips">
+            <button class="chip c-orig" data-i="0" aria-pressed="true" disabled>Original<em>unaided</em></button>
+            <span class="sep"></span>
+            <span class="ramp">
+              <button class="chip c-static" data-i="1" aria-pressed="false" disabled>Static<em>no dynamics</em></button>
+              <button class="chip c-med" data-i="2" aria-pressed="false" disabled>WDRC<em>attack/release</em></button>
+            </span>
+          </div>
+          <div class="transport">
+            <button class="play" id="tplay" aria-label="Play" disabled>{PLAY}{PAUSE}</button>
+            <div class="scrub"><div class="fill" id="tfill"></div><input class="seek" id="tseek" type="range"
+              min="0" max="1000" value="0" aria-label="Seek"></div>
+            <span class="time" id="ttime"><b>0:00</b> / 0:00</span>
+          </div>
+          <p class="cue"><span class="dot"></span><b class="cur" id="tcur">Original</b><span class="hint">&mdash;
+            process a file, then switch to compare</span></p>
+          <div class="dlrow" id="dlrow" style="display:none">download:
+            <a id="dl_original" class="dl">original.wav</a><a id="dl_static" class="dl">static.wav</a>
+            <a id="dl_wdrc" class="dl">wdrc.wav</a></div>
+        </div>
+      </div>
+    </section>"""
+
 DOC = f"""<title>Band-by-band compression &mdash; a WDRC listening catalogue</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
@@ -221,6 +300,7 @@ footer .warn{{border-left:2px solid var(--amber);padding-left:12px;margin-top:14
 #th{{position:fixed;right:15px;bottom:15px;width:38px;height:38px;border-radius:50%;border:1px solid var(--line);
   background:var(--panel);color:var(--ink);font-size:16px;cursor:pointer;box-shadow:var(--sh);z-index:20}}
 #th:focus-visible{{outline:2px solid var(--teal);outline-offset:2px}}
+{TOOL_CSS}
 @media (max-width:840px){{
   .shell{{grid-template-columns:1fr;gap:0}}
   .rail{{position:static;padding:22px 0 6px;border-bottom:1px solid var(--line);margin-bottom:8px}}
@@ -240,7 +320,9 @@ footer .warn{{border-left:2px solid var(--amber);padding-left:12px;margin-top:14
 
 <div class="shell">
   <aside class="rail">
-    <h3>Subjects</h3>
+    <h3>Interactive</h3>
+    <nav><a href="#tool" data-spy="tool"><span>&#9881;</span>Try your own</a></nav>
+    <h3 class="mt">Subjects</h3>
     <nav>{RAIL_SUB}</nav>
     <h3 class="mt">Textbook shapes</h3>
     <nav>{RAIL_SHAPE}</nav>
@@ -259,6 +341,7 @@ footer .warn{{border-left:2px solid var(--amber);padding-left:12px;margin-top:14
 {SUBJECTS}
     <p class="band-label">Textbook shapes &mdash; static vs WDRC, release swept</p>
 {SHAPES}
+{TOOL_HTML}
   </main>
 </div>
 
@@ -311,13 +394,15 @@ footer .warn{{border-left:2px solid var(--amber);padding-left:12px;margin-top:14
     var io=new IntersectionObserver(function(es){{es.forEach(function(e){{if(e.isIntersecting){{
       Object.keys(links).forEach(function(k){{links[k].classList.remove('active');}});
       if(links[e.target.id])links[e.target.id].classList.add('active');}}}});}},{{rootMargin:'-45% 0px -50% 0px'}});
-    document.querySelectorAll('.specimen').forEach(function(s){{io.observe(s);}});
+    document.querySelectorAll('.specimen, .tool').forEach(function(s){{io.observe(s);}});
   }}
   var root=document.documentElement;
   document.getElementById('th').addEventListener('click',function(){{
     root.setAttribute('data-theme',root.getAttribute('data-theme')==='dark'?'light':'dark');}});
 }})();
 </script>
+<script>{DSP_JS}</script>
+<script>{TOOL_JS}</script>
 """
 
 open(os.path.join(HERE, "index.html"), "w").write(DOC)
