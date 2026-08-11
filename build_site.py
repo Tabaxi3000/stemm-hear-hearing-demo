@@ -395,8 +395,8 @@ footer .warn{{border-left:2px solid var(--amber);padding-left:12px;margin-top:14
       fast:'--c-fast',med:'--c-med',slow:'--c-slow',left:'--blue',right:'--red',bin:'--teal'}};
       return css.getPropertyValue(map[c?c[1]:'orig']||'--amber');}}
     pool[0].addEventListener('loadedmetadata',function(){{dur=pool[0].duration||20;ttot.textContent=fmt(dur);}});
-    function tick(){{var a=pool[active],p=dur?a.currentTime/dur:0;fill.style.width=(p*100)+'%';
-      seek.value=Math.round(p*1000);tcur.textContent=fmt(a.currentTime);if(on)requestAnimationFrame(tick);}}
+    function tick(){{var a=pool[active],p=dur?Math.min(1,a.currentTime/dur):0;fill.style.width=(p*100)+'%';
+      seek.value=Math.round(p*1000);tcur.textContent=fmt(Math.min(a.currentTime,dur));if(on)requestAnimationFrame(tick);}}
     function setOn(v){{on=v;play.classList.toggle('on',v);play.setAttribute('aria-label',v?'Pause':'Play');if(v)requestAnimationFrame(tick);}}
     play.addEventListener('click',function(){{if(on){{pool[active].pause();setOn(false);}}else{{pool[active].play();setOn(true);}}}});
     pool.forEach(function(a){{a.addEventListener('ended',function(){{setOn(false);pool.forEach(function(x){{x.currentTime=0;}});

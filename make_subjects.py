@@ -76,10 +76,9 @@ def subject_png(sub, path):
 
 # ---- stereo AAC encode ---------------------------------------------------------------
 def to_aac_b64(st):                                   # st: (N,2) float
-    st = np.clip(st, -0.985, 0.985)
-    st44 = np.stack([resample_poly(st[:,0],441,160), resample_poly(st[:,1],441,160)], 1)
+    st = np.clip(st, -0.985, 0.985)                   # encode at the true SR (32 kHz)
     with tempfile.TemporaryDirectory() as d:
-        wavfile.write(f"{d}/a.wav", 44100, (np.clip(st44,-1,1)*32767).astype(np.int16))
+        wavfile.write(f"{d}/a.wav", SR, (np.clip(st,-1,1)*32767).astype(np.int16))
         subprocess.run(["afconvert","-f","m4af","-d","aac","-b","96000",f"{d}/a.wav",f"{d}/a.m4a"],
                        check=True, capture_output=True)
         return base64.b64encode(open(f"{d}/a.m4a","rb").read()).decode()

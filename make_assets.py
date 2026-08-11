@@ -130,11 +130,10 @@ for k, w in clips.items():
     print(f"   {k:26s} rms {20*np.log10(_rms(w)):6.1f}   peak {20*np.log10(np.max(np.abs(w))+1e-12):6.1f}")
 
 # ---- 5. encode wav(16k) -> 44.1k AAC m4a -> base64 -----------------------------------
-def to_aac_b64(wav16k):
-    y = np.clip(wav16k, -0.985, 0.985)
-    y44 = resample_poly(y, 441, 160)
+def to_aac_b64(y):
+    y = np.clip(y, -0.985, 0.985)                         # encode at the true SR (32 kHz); afconvert supports it
     with tempfile.TemporaryDirectory() as d:
-        wavfile.write(f"{d}/a.wav", 44100, (np.clip(y44, -1, 1) * 32767).astype(np.int16))
+        wavfile.write(f"{d}/a.wav", SR, (np.clip(y, -1, 1) * 32767).astype(np.int16))
         subprocess.run(["afconvert", "-f", "m4af", "-d", "aac", "-b", "96000",
                         f"{d}/a.wav", f"{d}/a.m4a"], check=True, capture_output=True)
         return base64.b64encode(open(f"{d}/a.m4a", "rb").read()).decode()

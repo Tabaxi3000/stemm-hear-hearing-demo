@@ -147,9 +147,9 @@
   // ---- player ------------------------------------------------------------------------
   var pool = [], active = 0, on = false, dur = 0;
   function fmt(t) { t = Math.max(0, t | 0); return (t / 60 | 0) + ":" + ("0" + (t % 60)).slice(-2); }
-  function tick() { var a = pool[active]; if (!a) return; var p = dur ? a.currentTime / dur : 0;
+  function tick() { var a = pool[active]; if (!a) return; var p = dur ? Math.min(1, a.currentTime / dur) : 0;
     $("tfill").style.width = (p * 100) + "%"; $("tseek").value = Math.round(p * 1000);
-    $("ttime").innerHTML = "<b>" + fmt(a.currentTime) + "</b> / " + fmt(dur); if (on) requestAnimationFrame(tick); }
+    $("ttime").innerHTML = "<b>" + fmt(Math.min(a.currentTime, dur)) + "</b> / " + fmt(dur); if (on) requestAnimationFrame(tick); }
   function setOn(v) { on = v; $("tplay").classList.toggle("on", v); if (v) requestAnimationFrame(tick); }
   function switchTo(i) {
     if (i === active || !pool[i]) return; var f = pool[active], t = pool[i];
