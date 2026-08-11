@@ -95,7 +95,7 @@
   }
   var PYCODE = [
     "x = np.asarray(xin.to_py(), dtype=float)",
-    "ag = {int(k): float(v) for k, v in agjs.to_py().items()}",
+    "ag = {int(f): float(v) for f, v in zip(list(agf), list(agv))}",
     "fc = sp.band_centres(sp.band_edges(100.0, 12000.0, 32, 'greenwood'))",
     "pm = sp.PersonalizedGainMap(fc, audiogram=ag)",
     "cm = dict(backend='stft', n_bands=32, flo=100.0, fhi=12000.0, carrier='original',",
@@ -109,7 +109,8 @@
     var relMs = +$("rel").value;
     if (pyReady) {
       pyodide.globals.set("xin", input);
-      pyodide.globals.set("agjs", pyodide.toPy(FREQS.reduce(function (o, f, i) { o[f] = ag[i]; return o; }, {})));
+      pyodide.globals.set("agf", pyodide.toPy(FREQS));
+      pyodide.globals.set("agv", pyodide.toPy(ag));
       pyodide.globals.set("sr", SR); pyodide.globals.set("rel", relMs);
       pyodide.runPython(PYCODE);
       var ys = pyodide.globals.get("ys").toJs(), yw = pyodide.globals.get("yw").toJs();
