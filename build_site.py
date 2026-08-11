@@ -6,9 +6,11 @@
 
 All audio + charts are embedded as base64 data URIs, so the page has no external requests.
 """
-import os, json, html
+import os, json, html, shutil
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# keep a copy of the real module next to the site so the in-browser tool (Pyodide) can fetch it
+shutil.copy(os.path.join(HERE, "..", "colab", "speech_resynth.py"), os.path.join(HERE, "speech_resynth.py"))
 A = json.load(open(os.path.join(HERE, "assets.json")))
 S = json.load(open(os.path.join(HERE, "subjects.json")))
 
@@ -127,6 +129,7 @@ TOOL_CSS = """
 #tchips .chip:disabled{opacity:.45;cursor:default}
 .dlrow{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:16px;font-family:var(--mono);font-size:11px;color:var(--muted)}
 .dl{color:var(--teal);text-decoration:none;border-bottom:1px solid color-mix(in srgb,var(--teal) 40%,transparent);cursor:pointer}
+.engine{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:12px;padding-top:9px;border-top:1px dashed var(--line)}
 @media (max-width:560px){.tool-grid{grid-template-columns:1fr}.agwrap{flex-direction:column}}
 """
 
@@ -134,10 +137,12 @@ TOOL_HTML = f"""
     <p class="band-label">Interactive &mdash; run the pipeline on your own audio</p>
     <section class="tool" id="tool">
       <div class="sp-head"><span class="sp-num sub">&#9881;</span>
-        <div class="sp-title"><h2>Try your own <span class="kind">upload · in-browser · approximate</span></h2>
-        <p class="sp-blurb">Upload a WAV or MP3, set an audiogram, and hear it re-synthesised &mdash; Original vs
-        Static vs WDRC. Everything runs in your browser (nothing is uploaded); it's a JavaScript port of the
-        pipeline, so it's approximate, not identical to the Colab notebook.</p></div></div>
+        <div class="sp-title"><h2>Try your own <span class="kind">upload · in-browser · exact</span></h2>
+        <p class="sp-blurb">Upload a WAV or MP3, set an audiogram, and hear it re-synthesised &mdash; Original
+        vs Static vs WDRC, at 32&nbsp;kHz with the bank running to 12&nbsp;kHz. It runs the <b>real Python
+        module</b> in your browser via Pyodide (numpy/scipy in WebAssembly), so the output is notebook-identical;
+        the first run downloads ~30&nbsp;MB and falls back to a JS approximation if that can't load. Nothing is
+        uploaded &mdash; it all runs on your machine.</p></div></div>
       <div class="tool-grid">
         <div class="panel">
           <label class="filebtn">Choose audio<input type="file" id="tf" accept="audio/*"></label>
@@ -151,6 +156,7 @@ TOOL_HTML = f"""
             <input type="range" id="rel" min="20" max="600" step="10" value="150"><span id="relv">150 ms</span></div>
           <button id="run" class="runbtn" disabled>Process</button>
           <span id="tstatus" class="status">pick an audio file to start</span>
+          <div id="engine" class="engine">engine: real Python module (Pyodide) &mdash; boots on first use</div>
         </div>
         <div class="panel">
           <div class="chips" id="tchips">
@@ -347,7 +353,9 @@ footer .warn{{border-left:2px solid var(--amber);padding-left:12px;margin-top:14
 
 <footer><div class="in">
   <p class="lbl">Method</p>
-  <p><b>STFT filter bank</b>, 28 Greenwood bands, original fine-structure carrier at <b>65&nbsp;dB SPL</b>.
+  <p><b>STFT filter bank</b>, 32 Greenwood bands to <b>12&nbsp;kHz</b> (32&nbsp;kHz sample rate), original
+  fine-structure carrier at <b>65&nbsp;dB SPL</b>. The 64&nbsp;kbps audiobook speech is band-limited to
+  ~8&nbsp;kHz, so the wider bank shows mainly on the music and on high-quality uploads.
   Per-band gain is a straight line mapping the input range onto <b>[threshold, UCL]</b> with a low-level
   expansion floor. <b>Static</b> applies it instantaneously; <b>WDRC</b> adds a 5&nbsp;ms attack and a
   <b>60&nbsp;/&nbsp;150&nbsp;/&nbsp;400&nbsp;ms</b> release. Subjects are fit per ear and played in stereo.

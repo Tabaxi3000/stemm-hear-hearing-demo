@@ -12,17 +12,18 @@ SC = "/private/tmp/claude-502/-Users-tabaxitft-Desktop-STEMM-HEAR/02cdbe4e-d460-
 sys.path.insert(0, "/Users/tabaxitft/Desktop/STEMM-HEAR/FILTER BANKS/speech_resynthesis/colab")
 import speech_resynth as sp
 
-SR = 16000
+SR = 32000                                     # 32 kHz -> 12 kHz filter bank (Nyquist 16 kHz)
 
-# ---- 1. paragraph clip: 40.1 .. 60.2 s of the chapter, bounded by pauses -------------
+# ---- 1. paragraph clip: 40.1..60.2 s of chapter 1 (cached 16 kHz decode -> 32 kHz) ----
+# NOTE: the 64 kbps LibriVox source is band-limited to ~8 kHz, so the speech has little energy
+# above 8 kHz; the wider bank matters for music / high-quality uploads, not this clip.
 sr0, full = wavfile.read(os.path.join(SC, "frank_full.wav"))
 full = full.astype(float) / 32768.0
-assert sr0 == SR
-clip = full[int(40.15 * SR): int(60.15 * SR)].copy()
-# 12 ms raised-cosine fades so the ends don't click
+clip16 = full[int(40.15 * sr0): int(60.15 * sr0)].copy()
+clip = resample_poly(clip16, SR // sr0, 1)     # 16 kHz -> 32 kHz
 nf = int(0.012 * SR); w = np.sin(np.linspace(0, np.pi / 2, nf)) ** 2
 clip[:nf] *= w; clip[-nf:] *= w[::-1]
-print("paragraph clip: %.2f s" % (len(clip) / SR))
+print("paragraph clip: %.2f s @ %d Hz" % (len(clip) / SR, SR))
 
 # present at 65 dB SPL (loud_ref maps full-scale -> 100 dB SPL, so RMS -35 dBFS reads 65)
 x65 = clip / (np.sqrt(np.mean(clip ** 2)) + 1e-12) * 10 ** ((65 - 100) / 20)
@@ -83,11 +84,13 @@ def comp_png(ag, path):
 # gate_db adds an EXPANSION FLOOR: bands >45 dB below their own peak fade toward unity gain, so
 # the aid stops boosting the between-word noise floor (esp. the heavily-amplified high bands of a
 # steep loss) -- the main avoidable source of "spit"/roughness.
-COMMON = dict(backend="stft", n_bands=28, carrier="original", loud_ref=LOUD, match_rms=False,
-              gate_db=-45.0, gate_knee_db=18.0)
+FLO, FHI, NB = 100.0, 12000.0, 32              # bank up to 12 kHz
+FC32 = sp.band_centres(sp.band_edges(FLO, FHI, NB, "greenwood"))
+COMMON = dict(backend="stft", n_bands=NB, flo=FLO, fhi=FHI, carrier="original", loud_ref=LOUD,
+              match_rms=False, gate_db=-45.0, gate_knee_db=18.0)
 
 def render(ag, attack=None, release=None, smooth=0.0):
-    pm = sp.PersonalizedGainMap(sp.band_centres(sp.band_edges(100.0, 7200.0, 28, "greenwood")), audiogram=ag)
+    pm = sp.PersonalizedGainMap(FC32, audiogram=ag)
     return sp.run(x65, SR, gain=pm, attack_ms=attack, release_ms=release, smooth_ms=smooth, **COMMON)["waveform"]
 
 CONDITIONS = [

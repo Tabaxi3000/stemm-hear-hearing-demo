@@ -2,10 +2,10 @@
 Clearly a stand-in; swap in the subject's real piece later."""
 import numpy as np
 from scipy.io import wavfile
-SR=16000
+SR=32000
 def note(f, dur, sr=SR):
     t=np.arange(int(dur*sr))/sr
-    y=sum((1.0/h)*np.sin(2*np.pi*f*h*t) for h in range(1,7))
+    y=sum((1.0/h**0.8)*np.sin(2*np.pi*f*h*t) for h in range(1,28))
     env=np.exp(-t/0.9)*(1-np.exp(-t/0.006))           # pluck: fast attack, slow decay
     return y*env
 def chord(fs, dur): 

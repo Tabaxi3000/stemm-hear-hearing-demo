@@ -11,11 +11,12 @@ import matplotlib.pyplot as plt
 SC = "/private/tmp/claude-502/-Users-tabaxitft-Desktop-STEMM-HEAR/02cdbe4e-d460-4375-a16a-683a6e731aea/scratchpad"
 sys.path.insert(0, "/Users/tabaxitft/Desktop/STEMM-HEAR/FILTER BANKS/speech_resynthesis/colab")
 import speech_resynth as sp
-SR = 16000
-FC = sp.band_centres(sp.band_edges(100.0, 7200.0, 28, "greenwood"))
+SR = 32000                                     # 32 kHz -> 12 kHz filter bank
+FLO, FHI, NB = 100.0, 12000.0, 32
+FC = sp.band_centres(sp.band_edges(FLO, FHI, NB, "greenwood"))
 LOUD = sp.dbfs_ref_for_spl(100.0)
-COMMON = dict(backend="stft", n_bands=28, carrier="original", loud_ref=LOUD, match_rms=False,
-              gate_db=-45.0, gate_knee_db=18.0)
+COMMON = dict(backend="stft", n_bands=NB, flo=FLO, fhi=FHI, carrier="original", loud_ref=LOUD,
+              match_rms=False, gate_db=-45.0, gate_knee_db=18.0)
 
 SUBJECTS = [
     dict(id="speech_a", name="Speech A", kind="Speech · asymmetric loss",
@@ -29,14 +30,15 @@ SUBJECTS = [
 ]
 
 # ---- sources presented at 65 dB SPL --------------------------------------------------
-def load65(path):
-    sr, x = wavfile.read(path); x = x.astype(float) / 32768.0
-    assert sr == SR
-    return x / (np.sqrt(np.mean(x ** 2)) + 1e-12) * 10 ** ((65 - 100) / 20)
-SPEECH = load65(os.path.join(SC, "frank_full.wav"))[int(40.15*SR):int(60.15*SR)]
-nf = int(0.012*SR); w = np.sin(np.linspace(0, np.pi/2, nf))**2
-SPEECH = SPEECH.copy(); SPEECH[:nf] *= w; SPEECH[-nf:] *= w[::-1]
-MUSIC = load65(os.path.join(SC, "placeholder_music.wav"))
+def present65(x): return x / (np.sqrt(np.mean(x ** 2)) + 1e-12) * 10 ** ((65 - 100) / 20)
+# speech: cached 16 kHz decode (source ~8 kHz-limited) -> slice -> 32 kHz
+sr0, f0 = wavfile.read(os.path.join(SC, "frank_full.wav")); f0 = f0.astype(float) / 32768.0
+speech = resample_poly(f0[int(40.15 * sr0):int(60.15 * sr0)], SR // sr0, 1)
+nf = int(0.012 * SR); w = np.sin(np.linspace(0, np.pi/2, nf))**2
+speech[:nf] *= w; speech[-nf:] *= w[::-1]
+SPEECH = present65(speech)
+srm, m = wavfile.read(os.path.join(SC, "placeholder_music.wav")); assert srm == SR
+MUSIC = present65(m.astype(float) / 32768.0)
 
 def render_ear(x65, ag):
     pm = sp.PersonalizedGainMap(FC, audiogram=ag)
