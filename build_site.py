@@ -21,6 +21,15 @@ BLURB = {
 }
 COND = {"static": ("STATIC", "no dynamics", "static"), "wdrc_fast": ("60", "fast release", "fast"),
         "wdrc_med": ("150", "medium", "med"), "wdrc_slow": ("400", "slow release", "slow")}
+# per-subject copy + which part is a stand-in (audiogram vs music)
+SUBJECT_META = {
+    "speech_a": {"ph": "placeholder audiogram",
+                 "blurb": "Strongly asymmetric loss — right ear moderate-severe, left near-normal, so the "
+                          "ears get very different fits. Real audiogram to come; the shape here is a stand-in."},
+    "musician_a": {"ph": "placeholder music",
+                   "blurb": "Real audiogram — mild-to-mod-severe high-frequency loss, a little worse on the "
+                            "left. A synthesised clip stands in for the chosen piece for now."},
+}
 SUBCOND = {"original": ("Original", "unaided", "orig"), "left": ("L fit", "left audiogram", "left"),
            "right": ("R fit", "right audiogram", "right"), "binaural": ("Binaural", "per-ear", "bin")}
 
@@ -67,7 +76,9 @@ def shape_section(n, s):
 
 
 def subject_section(s):
-    badge = ('<span class="badge">placeholder music</span>' if s.get("placeholder") else "")
+    meta = SUBJECT_META.get(s["id"], {})
+    badge = (f'<span class="badge">{meta["ph"]}</span>' if meta.get("ph") else "")
+    blurb = meta.get("blurb", s.get("blurb", ""))
     ild = s.get("ild_db", 0.0)
     ild_txt = (f'Aided right&minus;left level difference <b>{ild:+.0f}&nbsp;dB</b>.'
                if abs(ild) >= 1 else 'The two ears end up <b>nearly matched</b>.')
@@ -82,7 +93,7 @@ def subject_section(s):
     <section class="specimen subject" id="st-{s['id']}" data-player>
       <div class="sp-head"><span class="sp-num sub">&#9670;</span>
         <div class="sp-title"><h2>{html.escape(s['name'])} <span class="kind">{html.escape(s['kind'])}</span>{badge}</h2>
-        <p class="sp-blurb">{html.escape(s['blurb'])} {ild_txt}</p></div></div>
+        <p class="sp-blurb">{html.escape(blurb)} {ild_txt}</p></div></div>
       <figure class="paper wide"><img alt="Two-ear audiogram and prescribed gain, {html.escape(s['name'])}"
         src="data:image/png;base64,{s['png']}"><figcaption>Both ears &mdash; audiogram &amp; prescribed gain</figcaption></figure>
       <div class="console"><div class="chips">{chips[0]}<span class="sep"></span>
@@ -359,8 +370,9 @@ footer .warn{{border-left:2px solid var(--amber);padding-left:12px;margin-top:14
   Per-band gain is a straight line mapping the input range onto <b>[threshold, UCL]</b> with a low-level
   expansion floor. <b>Static</b> applies it instantaneously; <b>WDRC</b> adds a 5&nbsp;ms attack and a
   <b>60&nbsp;/&nbsp;150&nbsp;/&nbsp;400&nbsp;ms</b> release. Subjects are fit per ear and played in stereo.
-  Speech A's audiogram is a de-identified asymmetric case; Musician A uses a real audiogram with a
-  <b>synthesised placeholder</b> in place of the chosen piece.</p>
+  <b>Musician A</b> uses a real audiogram (the music is a synthesised placeholder for now);
+  <b>Speech A</b> pairs a real speech clip with a <b>placeholder audiogram</b> until the subject's own
+  is available.</p>
   <p class="warn"><b>Research prototype &mdash; not a medical device or a fitting.</b> Processing is offline
   and played to normal-hearing ears, so it shows the aid's output, not what an impaired listener perceives.
   On a steep loss, fully lifting the highs to threshold over-amplifies sibilants; a real fit would use
