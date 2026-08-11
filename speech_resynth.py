@@ -24,7 +24,7 @@ __all__ = [
     "extract_envelope", "make_carrier",
     "LevelDB", "PerceptualLoudness", "get_measure", "dbfs_ref_for_spl",
     "GenericGainMap",
-    "EXAMPLE_AUDIOGRAM", "audiogram_thresholds", "PersonalizedGainMap", "PersonalizedWDRC",
+    "EXAMPLE_AUDIOGRAM", "audiogram_thresholds", "PersonalizedGainMap", "PrescriptiveGain", "PersonalizedWDRC",
     "time_stretch", "frequency_compress",
     "run", "binaural", "make_speech_like",
 ]
@@ -327,6 +327,32 @@ class PersonalizedGainMap:
         for f, s, o, t in zip(self.fc, self.slope, self.offset, self.threshold_db):
             lines.append(f"  {f:7.0f} Hz : slope={s:.3f} offset={o:6.1f}  (thr={t:.0f} dB)")
         return "\n".join(lines)
+
+
+class PrescriptiveGain:
+    """A realistic fit instead of full lift-to-threshold. Rather than mapping soft input all the way
+    up to threshold (which pours 40-60 dB into a steep high-frequency loss and over-amplifies
+    sibilants), this prescribes HALF the loss (Lybarger half-gain rule) with a high-frequency rolloff
+    and a gain cap, applies WDRC compression above a knee, and limits the output at UCL.
+
+    Per band b: soft-speech insertion gain g0_b = clip(frac*T_b - rolloff(f_b), 0, gmax), where
+    rolloff = roll_db_oct dB per octave above roll_from Hz. forward(L) reduces that gain above the
+    compression knee (ratio cr) and caps the output at U_b. Pair with dB-SPL calibration like the
+    other maps (loud_ref=dbfs_ref_for_spl(...))."""
+
+    def __init__(self, fc, audiogram=None, frac=0.5, roll_from=2000.0, roll_db_oct=6.0,
+                 gmax=42.0, cr=2.2, knee_db=45.0, ucl_floor=100.0, headroom_db=5.0):
+        self.fc = np.asarray(fc, float)
+        thr = audiogram_thresholds(self.fc, audiogram)
+        roll = np.maximum(0.0, np.log2(np.maximum(self.fc, 1.0) / roll_from)) * roll_db_oct
+        self.g0 = np.clip(frac * thr - roll, 0.0, gmax)                 # soft-speech insertion gain
+        self.ucl = np.maximum(ucl_floor, 100.0 + 0.25 * thr) - headroom_db
+        self.threshold_db, self.cr, self.knee = thr, float(cr), float(knee_db)
+
+    def forward(self, L):
+        L = np.asarray(L, float)
+        g = self.g0[:, None] - np.maximum(0.0, L - self.knee) * (1.0 - 1.0 / self.cr)   # WDRC above knee
+        return np.minimum(L + np.maximum(g, 0.0), self.ucl[:, None])                     # UCL limit
 
 
 class PersonalizedWDRC:

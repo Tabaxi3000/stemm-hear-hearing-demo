@@ -78,6 +78,13 @@
       var ucl = Math.max(uclFloor, 100 + 0.25 * thr[b]) - headroom;
       slope[b] = (ucl - thr[b]) / 100; off[b] = thr[b];       // in_lo=0 -> input 0 maps to threshold
     }
+    var rx = !!opt.prescriptive, g0 = new Float64Array(n), uclA = new Float64Array(n);   // Rx: half-gain + rolloff
+    var RX_CR = 2.2, RX_KNEE = 45.0;
+    if (rx) for (b = 0; b < n; b++) {
+      var roll = Math.max(0, Math.log2(Math.max(fc[b], 1) / 2000)) * 6.0;
+      g0[b] = Math.min(42, Math.max(0, 0.5 * thr[b] - roll));
+      uclA[b] = Math.max(100, 100 + 0.25 * thr[b]) - 5;
+    }
     var half = W >> 1, binBand = new Int16Array(half + 1);
     for (var k = 0; k <= half; k++) {
       var f = k * sr / W, bb = -1;
@@ -114,7 +121,8 @@
       for (b = 0; b < n; b++) {
         var env = Math.sqrt(sums[b]) / W / winRms;             // ~ time-domain RMS of the band
         var L = 20 * log10(env / LOUD_REF + EPS);
-        var Lout = slope[b] * L + off[b];
+        var Lout = rx ? Math.min(L + Math.max(0, g0[b] - Math.max(0, L - RX_KNEE) * (1 - 1 / RX_CR)), uclA[b])
+                      : slope[b] * L + off[b];
         var g = Math.pow(10, (Lout - L) / 20);
         if (mode === "wdrc") { var a = g < gPrev[b] ? aAtk : aRel; g = a * gPrev[b] + (1 - a) * g; }
         gPrev[b] = g; gBand[b] = g;

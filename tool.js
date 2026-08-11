@@ -102,7 +102,8 @@
     "          loud_ref=sp.dbfs_ref_for_spl(100.0), match_rms=False, gate_db=-45.0, gate_knee_db=18.0)",
     "x65 = x / (np.sqrt(np.mean(x**2)) + 1e-12) * 10**((65 - 100) / 20)",
     "ys = sp.run(x65, sr, gain=pm, **cm)['waveform'].astype('float32')",
-    "yw = sp.run(x65, sr, gain=pm, attack_ms=5, release_ms=rel, **cm)['waveform'].astype('float32')"
+    "yw = sp.run(x65, sr, gain=pm, attack_ms=5, release_ms=rel, **cm)['waveform'].astype('float32')",
+    "yr = sp.run(x65, sr, gain=sp.PrescriptiveGain(fc, ag), attack_ms=5, release_ms=rel, **cm)['waveform'].astype('float32')"
   ].join("\n");
 
   function runEngine() {                               // -> Promise<{static,wdrc}>
@@ -113,13 +114,15 @@
       pyodide.globals.set("agv", pyodide.toPy(ag));
       pyodide.globals.set("sr", SR); pyodide.globals.set("rel", relMs);
       pyodide.runPython(PYCODE);
-      var ys = pyodide.globals.get("ys").toJs(), yw = pyodide.globals.get("yw").toJs();
-      return Promise.resolve({ static: Float32Array.from(ys), wdrc: Float32Array.from(yw) });
+      var ys = pyodide.globals.get("ys").toJs(), yw = pyodide.globals.get("yw").toJs(),
+          yr = pyodide.globals.get("yr").toJs();
+      return Promise.resolve({ static: Float32Array.from(ys), wdrc: Float32Array.from(yw), rx: Float32Array.from(yr) });
     }
     var opt = { agFreqs: FREQS, agVals: ag, presentSPL: 65, nBands: 32 };     // JS fallback
     return Promise.resolve({
       static: DSP.process(input, SR, Object.assign({ mode: "static" }, opt)),
-      wdrc: DSP.process(input, SR, Object.assign({ mode: "wdrc", attackMs: 5, releaseMs: relMs }, opt))
+      wdrc: DSP.process(input, SR, Object.assign({ mode: "wdrc", attackMs: 5, releaseMs: relMs }, opt)),
+      rx: DSP.process(input, SR, Object.assign({ mode: "wdrc", attackMs: 5, releaseMs: relMs, prescriptive: true }, opt))
     });
   }
 
@@ -156,7 +159,7 @@
     if (i === active || !pool[i]) return; var f = pool[active], t = pool[i];
     if (f) { f.pause(); t.currentTime = f.currentTime; } active = i;
     document.querySelectorAll("#tchips .chip").forEach(function (c) { c.setAttribute("aria-pressed", c.dataset.i == i); });
-    $("tcur").textContent = ["Original", "Static", "WDRC"][i]; if (on) t.play();
+    $("tcur").textContent = ["Original", "Static", "WDRC", "Rx"][i]; if (on) t.play();
   }
 
   function process() {
@@ -168,7 +171,8 @@
       clips.original = normalize(input.slice(), -24);
       clips.static = normalize(r.static, -20);
       clips.wdrc = normalize(r.wdrc, -20);
-      ["original", "static", "wdrc"].forEach(function (k, i) {
+      clips.rx = normalize(r.rx, -20);
+      ["original", "static", "wdrc", "rx"].forEach(function (k, i) {
         if (urls[k]) URL.revokeObjectURL(urls[k]);
         urls[k] = URL.createObjectURL(toWav(clips[k], SR));
         pool[i].src = urls[k];
@@ -190,7 +194,7 @@
     document.querySelectorAll("[data-preset]").forEach(function (b) {
       b.addEventListener("click", function () { preset(b.dataset.preset); }); });
     $("run").addEventListener("click", process);
-    for (var i = 0; i < 3; i++) { pool[i] = new Audio(); pool[i].preload = "auto"; }
+    for (var i = 0; i < 4; i++) { pool[i] = new Audio(); pool[i].preload = "auto"; }
     pool.forEach(function (a) { a.addEventListener("ended", function () { setOn(false);
       pool.forEach(function (x) { x.currentTime = 0; }); $("tfill").style.width = "0%"; $("tseek").value = 0; }); });
     $("tplay").addEventListener("click", function () { if (!pool[active].src) return;

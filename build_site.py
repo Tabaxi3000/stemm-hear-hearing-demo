@@ -155,7 +155,7 @@ TOOL_HTML = f"""
       <div class="sp-head"><span class="sp-num sub">&#9881;</span>
         <div class="sp-title"><h2>Try your own <span class="kind">upload · in-browser · exact</span></h2>
         <p class="sp-blurb">Upload a WAV or MP3, set an audiogram, and hear it re-synthesised &mdash; Original
-        vs Static vs WDRC, at 32&nbsp;kHz with the bank running to 12&nbsp;kHz. It runs the <b>real Python
+        vs Static vs WDRC vs a realistic <b>Rx</b> fit (half-gain + rolloff + limiting), at 32&nbsp;kHz with the bank running to 12&nbsp;kHz. It runs the <b>real Python
         module</b> in your browser via Pyodide (numpy/scipy in WebAssembly), so the output is notebook-identical;
         the first run downloads ~30&nbsp;MB and falls back to a JS approximation if that can't load. Nothing is
         uploaded &mdash; it all runs on your machine.</p></div></div>
@@ -181,6 +181,7 @@ TOOL_HTML = f"""
             <span class="ramp">
               <button class="chip c-static" data-i="1" aria-pressed="false" disabled>Static<em>no dynamics</em></button>
               <button class="chip c-med" data-i="2" aria-pressed="false" disabled>WDRC<em>attack/release</em></button>
+              <button class="chip c-rx" data-i="3" aria-pressed="false" disabled>Rx<em>realistic fit</em></button>
             </span>
           </div>
           <div class="transport">
@@ -193,7 +194,7 @@ TOOL_HTML = f"""
             process a file, then switch to compare</span></p>
           <div class="dlrow" id="dlrow" style="display:none">download:
             <a id="dl_original" class="dl">original.wav</a><a id="dl_static" class="dl">static.wav</a>
-            <a id="dl_wdrc" class="dl">wdrc.wav</a></div>
+            <a id="dl_wdrc" class="dl">wdrc.wav</a><a id="dl_rx" class="dl">rx.wav</a></div>
         </div>
       </div>
     </section>"""
