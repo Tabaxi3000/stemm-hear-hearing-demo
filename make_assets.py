@@ -89,15 +89,34 @@ FC32 = sp.band_centres(sp.band_edges(FLO, FHI, NB, "greenwood"))
 COMMON = dict(backend="stft", n_bands=NB, flo=FLO, fhi=FHI, carrier="original", loud_ref=LOUD,
               match_rms=False, gate_db=-45.0, gate_knee_db=18.0)
 
-def render(ag, attack=None, release=None, smooth=0.0):
-    pm = sp.PersonalizedGainMap(FC32, audiogram=ag)
-    return sp.run(x65, SR, gain=pm, attack_ms=attack, release_ms=release, smooth_ms=smooth, **COMMON)["waveform"]
+
+class PrescriptiveGain:
+    """A realistic fit instead of full lift-to-threshold: half-gain (Lybarger) with a
+    high-frequency rolloff and a gain cap, WDRC above a knee, and UCL output limiting -- so a
+    steep loss no longer gets 40-60 dB of high-frequency gain that over-amplifies sibilants."""
+    def __init__(self, fc, audiogram, frac=0.5, roll_from=2000.0, roll_db_oct=6.0, gmax=42.0, cr=2.2):
+        thr = sp.audiogram_thresholds(fc, audiogram)
+        roll = np.maximum(0.0, np.log2(np.maximum(fc, 1.0) / roll_from)) * roll_db_oct
+        self.g0 = np.clip(frac * thr - roll, 0.0, gmax)          # soft-speech insertion gain
+        self.ucl = np.maximum(100.0, 100.0 + 0.25 * thr) - 5.0
+        self.cr, self.knee = cr, 45.0
+
+    def forward(self, L):
+        L = np.asarray(L, float)
+        g = self.g0[:, None] - np.maximum(0.0, L - self.knee) * (1.0 - 1.0 / self.cr)  # WDRC above knee
+        return np.minimum(L + np.maximum(g, 0.0), self.ucl[:, None])                    # UCL limit
+
+
+def render(ag, attack=None, release=None, smooth=0.0, rx=False):
+    gain = PrescriptiveGain(FC32, ag) if rx else sp.PersonalizedGainMap(FC32, audiogram=ag)
+    return sp.run(x65, SR, gain=gain, attack_ms=attack, release_ms=release, smooth_ms=smooth, **COMMON)["waveform"]
 
 CONDITIONS = [
     ("static", "Without dynamics (static compression)", dict(smooth=0.0)),
     ("wdrc_fast", "WDRC · fast release (60 ms)", dict(attack=5, release=60)),
     ("wdrc_med", "WDRC · medium release (150 ms)", dict(attack=5, release=150)),
     ("wdrc_slow", "WDRC · slow release (400 ms)", dict(attack=5, release=400)),
+    ("prescriptive", "Prescriptive fit (half-gain + rolloff + limiting)", dict(attack=5, release=150, rx=True)),
 ]
 
 # render everything (raw)

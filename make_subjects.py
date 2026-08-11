@@ -95,16 +95,52 @@ for sub in SUBJECTS:
     binaural = np.stack([lraw, rraw], 1)
     binaural = _softknee(binaural * (T20 / _rms(binaural)))          # keep L/R ratio, overall ~-20 dBFS
     ild = 20*np.log10(_rms(rraw)/(_rms(lraw)+1e-12))
-    conds = [("original","Original","unaided",original),
-             ("left","Left-ear fit","left audiogram",left_iso),
-             ("right","Right-ear fit","right audiogram",right_iso),
-             ("binaural","Binaural","each ear its own fit",binaural)]
+    conds = [("original","Original","unaided","orig",original),
+             ("left","Left-ear fit","left audiogram","left",left_iso),
+             ("right","Right-ear fit","right audiogram","right",right_iso),
+             ("binaural","Binaural","each ear its own fit","bin",binaural)]
     pth = os.path.join(SC, f"subj_{sub['id']}.png"); subject_png(sub, pth)
     out["subjects"].append(dict(
         id=sub["id"], name=sub["name"], kind=sub["kind"], blurb=sub["blurb"],
         placeholder=(sub["src"]=="music"), ild_db=round(float(ild),1), png=png_b64(pth),
-        conditions=[dict(id=c, label=l, sub=s, aac=to_aac_b64(a)) for c,l,s,a in conds]))
+        figcap="Both ears &mdash; audiogram &amp; prescribed gain",
+        conditions=[dict(id=c, label=l, sub=s, cls=cl, aac=to_aac_b64(a)) for c,l,s,cl,a in conds]))
     print(f"{sub['name']:12s} rendered | aided R-L level diff {ild:+.1f} dB")
+
+# ---- ILD / localization demo: a panned talker, independent vs linked compression -----
+agSym = {250:30,500:35,1000:45,2000:55,4000:60,8000:60}         # symmetric, so only the ILD moves
+x80 = speech / (np.sqrt(np.mean(speech**2)) + 1e-12) * 10**((80-100)/20)   # loud -> compression
+ILD0 = 8.0
+xLp, xRp = x80 * 10**(-ILD0/40), x80 * 10**(ILD0/40)           # +8 dB in the right ear
+src = np.stack([xLp, xRp], 1)
+indep = sp.binaural(xLp, xRp, SR, agSym, agSym, link=False)
+linked = sp.binaural(xLp, xRp, SR, agSym, agSym, link=True)
+scl = 0.94 / (max(np.max(np.abs(z)) for z in (src, indep, linked)) + 1e-9)   # common scale keeps ILD
+out_ild = lambda st: 20*np.log10(_rms(st[:,1]) / _rms(st[:,0]))
+oi = {"source": out_ild(src), "indep": out_ild(indep), "linked": out_ild(linked)}
+print("ILD demo | source %.1f  independent %.1f  linked %.1f dB" % (oi["source"], oi["indep"], oi["linked"]))
+
+ildp = os.path.join(SC, "subj_ild.png")
+fig, axi = plt.subplots(figsize=(4.2, 3.0), dpi=150)
+bars = ["source", "indep", "linked"]; cols = ["#A9762C", RED, "#2C7A7B"]
+axi.bar(range(3), [oi[b] for b in bars], color=cols, width=.62)
+axi.axhline(ILD0, ls="--", color="#7C8E8B", lw=1.3); axi.text(2.4, ILD0+.15, f"source ILD {ILD0:.0f} dB", fontsize=8, ha="right", color="#5C6E6B")
+axi.set_xticks(range(3)); axi.set_xticklabels(["source", "independent", "linked"], fontsize=8.5)
+axi.set_ylabel("output ILD (dB)", fontsize=9); axi.set_ylim(0, ILD0+2.5)
+axi.set_title("Interaural level difference kept vs lost", fontsize=9.5)
+for s_ in ("top", "right"): axi.spines[s_].set_visible(False)
+fig.tight_layout(pad=.5); fig.savefig(ildp, transparent=True); plt.close(fig)
+
+condsI = [("source", "Source", "unaided, panned right", "orig", src*scl),
+          ("indep", "Independent", "two separate compressors", "right", indep*scl),
+          ("linked", "Linked", "shared drive level", "bin", linked*scl)]
+out["subjects"].append(dict(
+    id="ild", name="Localization (ILD)", kind="Binaural · ILD preservation",
+    blurb="A talker panned to the right (8 dB louder in the right ear). Independent per-ear compressors "
+          "pull the loud ear down and shrink that cue &mdash; the talker drifts toward centre; linking the "
+          "compression to a shared level preserves it.",
+    figcap="Output interaural level difference", png=png_b64(ildp),
+    conditions=[dict(id=c, label=l, sub=s, cls=cl, aac=to_aac_b64(a)) for c,l,s,cl,a in condsI]))
 
 json.dump(out, open(os.path.join(SC, "subjects.json"), "w"))
 print("wrote subjects.json  %.2f MB" % (os.path.getsize(os.path.join(SC,"subjects.json"))/1e6))

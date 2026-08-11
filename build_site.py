@@ -20,7 +20,8 @@ BLURB = {
     "skislope": "Near-normal lows, severe highs — the hardest fit.",
 }
 COND = {"static": ("STATIC", "no dynamics", "static"), "wdrc_fast": ("60", "fast release", "fast"),
-        "wdrc_med": ("150", "medium", "med"), "wdrc_slow": ("400", "slow release", "slow")}
+        "wdrc_med": ("150", "medium", "med"), "wdrc_slow": ("400", "slow release", "slow"),
+        "prescriptive": ("Rx", "realistic fit", "rx")}
 # per-subject copy + which part is a stand-in (audiogram vs music)
 SUBJECT_META = {
     "speech_a": {"ph": "placeholder audiogram",
@@ -54,7 +55,7 @@ def shape_section(n, s):
     for i, c in enumerate(s["conditions"], start=1):
         audios.append(f'<audio data-i="{i}" preload="auto" src="data:audio/mp4;base64,{c["aac"]}"></audio>')
         lab, sub, cls = COND[c["id"]]
-        unit = "" if c["id"] == "static" else '<span class="u">ms</span>'
+        unit = '<span class="u">ms</span>' if c["id"].startswith("wdrc_") else ""
         chips.append(f'<button class="chip c-{cls}" data-i="{i}" aria-pressed="false">{lab}{unit}<em>{sub}</em></button>')
     hint = "&mdash; switch while it plays; position holds, so you A/B the same instant"
     return f"""
@@ -79,23 +80,26 @@ def subject_section(s):
     meta = SUBJECT_META.get(s["id"], {})
     badge = (f'<span class="badge">{meta["ph"]}</span>' if meta.get("ph") else "")
     blurb = meta.get("blurb", s.get("blurb", ""))
-    ild = s.get("ild_db", 0.0)
-    ild_txt = (f'Aided right&minus;left level difference <b>{ild:+.0f}&nbsp;dB</b>.'
-               if abs(ild) >= 1 else 'The two ears end up <b>nearly matched</b>.')
+    ild_txt = ""
+    if "ild_db" in s:
+        ild = s["ild_db"]
+        ild_txt = (f'Aided right&minus;left level difference <b>{ild:+.0f}&nbsp;dB</b>.'
+                   if abs(ild) >= 1 else 'The two ears end up <b>nearly matched</b>.')
     audios, chips = [], []
     for i, c in enumerate(s["conditions"]):
         audios.append(f'<audio data-i="{i}" preload="auto" src="data:audio/mp4;base64,{c["aac"]}"></audio>')
-        lab, sub, cls = SUBCOND[c["id"]]
         pressed = "true" if i == 0 else "false"
-        chips.append(f'<button class="chip c-{cls}" data-i="{i}" aria-pressed="{pressed}">{lab}<em>{sub}</em></button>')
-    hint = "&mdash; headphones: left and right ears are fit differently"
+        chips.append(f'<button class="chip c-{c["cls"]}" data-i="{i}" aria-pressed="{pressed}">'
+                     f'{html.escape(c["label"])}<em>{html.escape(c["sub"])}</em></button>')
+    hint = "&mdash; headphones: the two ears differ"
+    figcap = s.get("figcap", "Both ears &mdash; audiogram &amp; prescribed gain")
     return f"""
     <section class="specimen subject" id="st-{s['id']}" data-player>
       <div class="sp-head"><span class="sp-num sub">&#9670;</span>
         <div class="sp-title"><h2>{html.escape(s['name'])} <span class="kind">{html.escape(s['kind'])}</span>{badge}</h2>
         <p class="sp-blurb">{html.escape(blurb)} {ild_txt}</p></div></div>
-      <figure class="paper wide"><img alt="Two-ear audiogram and prescribed gain, {html.escape(s['name'])}"
-        src="data:image/png;base64,{s['png']}"><figcaption>Both ears &mdash; audiogram &amp; prescribed gain</figcaption></figure>
+      <figure class="paper wide"><img alt="{html.escape(s['name'])}"
+        src="data:image/png;base64,{s['png']}"><figcaption>{figcap}</figcaption></figure>
       <div class="console"><div class="chips">{chips[0]}<span class="sep"></span>
         <span class="ramp">{''.join(chips[1:])}</span></div>
         {transport('Original').format(hint=hint)}</div>
@@ -103,7 +107,8 @@ def subject_section(s):
     </section>"""
 
 
-SUBJECTS = "\n".join(subject_section(s) for s in S["subjects"])
+SUBJECTS = "\n".join(subject_section(s) for s in S["subjects"] if s["id"] != "ild")
+ILD = "\n".join(subject_section(s) for s in S["subjects"] if s["id"] == "ild")
 SHAPES = "\n".join(shape_section(i + 1, s) for i, s in enumerate(A["audiograms"]))
 RAIL_SUB = "\n".join(f'<a href="#st-{s["id"]}" data-spy="st-{s["id"]}"><span>&#9670;</span>{html.escape(s["name"])}</a>'
                      for s in S["subjects"])
@@ -200,7 +205,7 @@ DOC = f"""<title>Band-by-band compression &mdash; a WDRC listening catalogue</ti
   --bg:#ECF1F0; --paper:#FCFDFC; --panel:#FBFDFC;
   --ink:#101B1A; --ink-2:#3B4B49; --muted:#69807C; --line:#D5E0DD;
   --teal:#22706F; --teal-2:#0E3B3B; --teal-3:#8FBDBB; --amber:#9C6A1E;
-  --red:#C0392B; --blue:#2C6FB0;
+  --red:#C0392B; --blue:#2C6FB0; --rx:#3F7D54;
   --c-static:#5F817F; --c-fast:#8FBDBB; --c-med:#22706F; --c-slow:#0E3B3B;
   --mono:ui-monospace,"SF Mono","Roboto Mono",Menlo,Consolas,monospace;
   --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
@@ -210,16 +215,16 @@ DOC = f"""<title>Band-by-band compression &mdash; a WDRC listening catalogue</ti
 @media (prefers-color-scheme:dark){{ :root{{
   --bg:#0B1413; --paper:#FCFDFC; --panel:#111E1C; --ink:#E6EEEC; --ink-2:#B3C4C1;
   --muted:#7E938F; --line:#213230; --teal:#4FA3A2; --teal-2:#78C4C3; --teal-3:#2E524F;
-  --amber:#C89A54; --red:#E0685A; --blue:#5E9BD6;
+  --amber:#C89A54; --red:#E0685A; --blue:#5E9BD6; --rx:#5FA877;
   --c-static:#89A6A3; --c-fast:#2E524F; --c-med:#4FA3A2; --c-slow:#78C4C3;
   --sh:0 1px 1px rgba(0,0,0,.4),0 12px 30px -16px rgba(0,0,0,.7);
 }} }}
 :root[data-theme="light"]{{ --bg:#ECF1F0;--paper:#FCFDFC;--panel:#FBFDFC;--ink:#101B1A;--ink-2:#3B4B49;
   --muted:#69807C;--line:#D5E0DD;--teal:#22706F;--teal-2:#0E3B3B;--teal-3:#8FBDBB;--amber:#9C6A1E;
-  --red:#C0392B;--blue:#2C6FB0;--c-static:#5F817F;--c-fast:#8FBDBB;--c-med:#22706F;--c-slow:#0E3B3B; }}
+  --red:#C0392B;--blue:#2C6FB0;--rx:#3F7D54;--c-static:#5F817F;--c-fast:#8FBDBB;--c-med:#22706F;--c-slow:#0E3B3B; }}
 :root[data-theme="dark"]{{ --bg:#0B1413;--paper:#FCFDFC;--panel:#111E1C;--ink:#E6EEEC;--ink-2:#B3C4C1;
   --muted:#7E938F;--line:#213230;--teal:#4FA3A2;--teal-2:#78C4C3;--teal-3:#2E524F;--amber:#C89A54;
-  --red:#E0685A;--blue:#5E9BD6;--c-static:#89A6A3;--c-fast:#2E524F;--c-med:#4FA3A2;--c-slow:#78C4C3; }}
+  --red:#E0685A;--blue:#5E9BD6;--rx:#5FA877;--c-static:#89A6A3;--c-fast:#2E524F;--c-med:#4FA3A2;--c-slow:#78C4C3; }}
 
 *{{box-sizing:border-box}} html{{scroll-behavior:smooth}}
 @media (prefers-reduced-motion:reduce){{ html{{scroll-behavior:auto}} *{{transition:none!important}} }}
@@ -291,7 +296,7 @@ figure.paper figcaption{{font-family:var(--mono);font-size:10px;letter-spacing:.
 .c-fast[aria-pressed="true"] em,.c-fast[aria-pressed="true"] .u{{color:color-mix(in srgb,var(--teal-2) 70%,transparent)}}
 .c-med[aria-pressed="true"]{{background:var(--c-med)}} .c-slow[aria-pressed="true"]{{background:var(--c-slow)}}
 .c-left[aria-pressed="true"]{{background:var(--blue)}} .c-right[aria-pressed="true"]{{background:var(--red)}}
-.c-bin[aria-pressed="true"]{{background:var(--teal)}}
+.c-bin[aria-pressed="true"]{{background:var(--teal)}} .c-rx[aria-pressed="true"]{{background:var(--rx)}}
 
 .transport{{display:flex;align-items:center;gap:15px;margin:16px 0 0}}
 .play{{flex:none;width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;background:var(--teal);
@@ -356,6 +361,8 @@ footer .warn{{border-left:2px solid var(--amber);padding-left:12px;margin-top:14
   <main>
     <p class="band-label">Real subjects &mdash; two ears, fit independently</p>
 {SUBJECTS}
+    <p class="band-label">Binaural &mdash; keeping localization (ILD)</p>
+{ILD}
     <p class="band-label">Textbook shapes &mdash; static vs WDRC, release swept</p>
 {SHAPES}
 {TOOL_HTML}
@@ -369,7 +376,9 @@ footer .warn{{border-left:2px solid var(--amber);padding-left:12px;margin-top:14
   ~8&nbsp;kHz, so the wider bank shows mainly on the music and on high-quality uploads.
   Per-band gain is a straight line mapping the input range onto <b>[threshold, UCL]</b> with a low-level
   expansion floor. <b>Static</b> applies it instantaneously; <b>WDRC</b> adds a 5&nbsp;ms attack and a
-  <b>60&nbsp;/&nbsp;150&nbsp;/&nbsp;400&nbsp;ms</b> release. Subjects are fit per ear and played in stereo.
+  <b>60&nbsp;/&nbsp;150&nbsp;/&nbsp;400&nbsp;ms</b> release. The <b>Prescriptive</b> tab swaps full
+  lift-to-threshold for a realistic half-gain + high-frequency rolloff + output-limiting fit, so a steep
+  loss no longer over-amplifies sibilants. Subjects are fit per ear and played in stereo.
   <b>Musician A</b> uses a real audiogram (the music is a synthesised placeholder for now);
   <b>Speech A</b> pairs a real speech clip with a <b>placeholder audiogram</b> until the subject's own
   is available.</p>
