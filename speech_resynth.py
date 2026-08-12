@@ -26,7 +26,7 @@ __all__ = [
     "GenericGainMap",
     "EXAMPLE_AUDIOGRAM", "audiogram_thresholds", "PersonalizedGainMap", "PrescriptiveGain", "PersonalizedWDRC",
     "time_stretch", "frequency_compress",
-    "run", "binaural", "make_speech_like", "HearingLossSim", "audibility", "add_noise", "denoise", "official_sii",
+    "run", "binaural", "make_speech_like", "HearingLossSim", "audibility", "add_noise", "denoise", "official_sii", "reverb",
 ]
 
 # --------------------------------------------------------------------------- #
@@ -658,19 +658,37 @@ def official_sii(aided, unaided, sr, audiogram):
 
 
 def add_noise(x, snr_db=5.0, kind="ssn", seed=0):
-    """Mix noise at a given SNR (dB, re signal RMS). kind='ssn' shapes white noise to the signal's
-    own long-term spectrum (speech-shaped noise); 'white' leaves it flat."""
+    """Mix noise at a given SNR (dB, re signal RMS). kind='ssn' = speech-shaped (white noise filtered
+    to the signal's own long-term spectrum); 'babble' = multi-talker babble made by overlapping several
+    shifted/reversed copies of the signal; 'white' = flat."""
     x = np.asarray(x, float)
     rng = np.random.default_rng(seed)
-    n = rng.standard_normal(len(x))
-    if kind == "ssn":
-        mag = np.abs(np.fft.rfft(x))
-        n = np.fft.irfft(np.fft.rfft(n) * (mag / (np.max(mag) + 1e-9)), len(x))
+    if kind == "babble":
+        n = np.zeros(len(x))
+        for k in range(6):                                     # ~6 overlapping "talkers"
+            n += np.roll(x[::-1] if k % 2 else x, int(rng.integers(len(x))))
+    else:
+        n = rng.standard_normal(len(x))
+        if kind == "ssn":
+            mag = np.abs(np.fft.rfft(x))
+            n = np.fft.irfft(np.fft.rfft(n) * (mag / (np.max(mag) + 1e-9)), len(x))
     n *= (np.sqrt(np.mean(x ** 2)) + 1e-12) / (np.sqrt(np.mean(n ** 2)) + 1e-12) * 10.0 ** (-snr_db / 20.0)
     return x + n
 
 
-def denoise(x, sr, win=1024, hop=256, over=1.6, floor_db=-14.0):
+def reverb(x, sr, rt60=0.5, seed=0):
+    """Add reverberation: convolve with a synthetic exponentially-decaying room impulse response
+    (rough Schroeder), RT60 in seconds. Level-matched to the input."""
+    x = np.asarray(x, float)
+    rng = np.random.default_rng(seed)
+    L = int(max(0.05, rt60) * sr)
+    ir = rng.standard_normal(L) * np.exp(-6.908 * np.arange(L) / (rt60 * sr))   # -60 dB by RT60
+    ir[0] += 1.0                                                # direct path
+    y = np.convolve(x, ir)[:len(x)]
+    return y * ((np.sqrt(np.mean(x ** 2)) + 1e-12) / (np.sqrt(np.mean(y ** 2)) + 1e-12))
+
+
+def denoise(x, sr, win=1024, hop=256, over=1.25, floor_db=-8.0):
     """Offline single-channel noise reduction (spectral Wiener). Estimates a per-frequency noise
     floor from the quietest 10% of frames and pulls each bin's gain toward silence where the SNR is
     low, floored so speech isn't gated out. Illustrative (a real aid uses a modulation/SNR estimate)."""

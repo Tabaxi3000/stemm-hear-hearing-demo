@@ -227,7 +227,9 @@ TOOL_HTML = f"""
           <span id="fname" class="fname">no file chosen yet</span>
           <div class="presets">audiogram:
             <button data-preset="normal">normal</button><button data-preset="sloping">sloping</button>
-            <button data-preset="flat">flat 40</button><button data-preset="ski">ski-slope</button></div>
+            <button data-preset="flat">flat 40</button><button data-preset="ski">ski-slope</button>
+            <button data-preset="cookie">cookie-bite</button><button data-preset="reverse">reverse</button>
+            <button data-preset="notch">noise-notch</button></div>
           <div class="agwrap"><canvas id="agc" width="290" height="170"></canvas>
             <div class="sliders" id="sliders"></div></div>
           <div class="rowctl"><label for="prog">Program</label>
@@ -252,7 +254,11 @@ TOOL_HTML = f"""
             recruitment &rarr; the <b>Personalized</b> fit compresses less (more linear).</p>
           <div class="rowctl"><label for="noise">Add noise</label>
             <select id="noise"><option value="-1" selected>off</option><option value="10">+10 dB SNR</option>
-            <option value="5">+5 dB SNR</option><option value="0">0 dB SNR</option></select><span>speech-shaped</span></div>
+            <option value="5">+5 dB SNR</option><option value="0">0 dB SNR</option></select>
+            <select id="ntype"><option value="ssn" selected>speech-shaped</option><option value="babble">babble</option></select></div>
+          <div class="rowctl"><label for="rev">Reverberation</label>
+            <select id="rev"><option value="0" selected>off</option><option value="0.3">small room</option>
+            <option value="0.6">hall</option></select></div>
           <label class="chk"><input type="checkbox" id="nr"> Noise reduction (aid-side denoiser)
             <span class="chknote">&mdash; suppresses steady noise between words; hear it help vs the unaided noisy Original</span></label>
           <label class="chk"><input type="checkbox" id="losssim"> Hear it as the patient does
