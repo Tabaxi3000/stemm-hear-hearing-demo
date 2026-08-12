@@ -6,7 +6,7 @@
   "use strict";
   var FREQS = [250, 500, 1000, 2000, 4000, 8000];
   var ag = [20, 25, 30, 40, 55, 65];
-  var SR = 32000, CAP = 22;
+  var SR = 32000, CAP = 10;                            // process up to 10 s (each fit is a full DSP pass)
   var input = null, fileName = "", urls = {}, clips = {};
   var pyodide = null, pyReady = false, pyBooting = false, pyFailed = false;
   var $ = function (id) { return document.getElementById(id); };
@@ -24,6 +24,14 @@
     var g = Math.pow(10, targetDb / 20) / rms(a), o = new Float32Array(a.length);
     for (var i = 0; i < a.length; i++) o[i] = a[i] * g;
     return softknee(o);
+  }
+  function showSII(si) {                               // audibility (SII proxy) per condition
+    var el = $("siirow"); if (!el) return;
+    if (!si) { el.style.display = "none"; return; }
+    var L = ["Original", "Static", "WDRC", "Rx", "NAL", "DSL"];
+    el.innerHTML = '<b>Audibility (SII proxy, 0–1):</b> ' +
+      L.map(function (n, i) { return n + " " + (si[i] != null ? si[i].toFixed(2) : "–"); }).join("  ·  ");
+    el.style.display = "";
   }
   function toWav(f32, sr) {
     var n = f32.length, buf = new ArrayBuffer(44 + n * 2), dv = new DataView(buf), i;
@@ -95,36 +103,55 @@
         engine("engine: approximate — JS fallback (Python unavailable)"); console.warn("Pyodide failed:", e); });
   }
   var PYCODE = [
-    "x = np.asarray(xin.to_py(), dtype=float)",
     "ag = {int(f): float(v) for f, v in zip(list(agf), list(agv))}",
     "fc = sp.band_centres(sp.band_edges(100.0, 12000.0, 32, 'greenwood'))",
-    "pm = sp.PersonalizedGainMap(fc, audiogram=ag)",
+    "thr = sp.audiogram_thresholds(fc, ag)",
+    "imp = np.exp(-0.5*((np.log10(fc)-np.log10(1800.0))/0.42)**2)",
     "cm = dict(backend='stft', n_bands=32, flo=100.0, fhi=12000.0, carrier='original',",
     "          loud_ref=sp.dbfs_ref_for_spl(100.0), match_rms=False, gate_db=-45.0, gate_knee_db=18.0)",
-    "x65 = x / (np.sqrt(np.mean(x**2)) + 1e-12) * 10**((65 - 100) / 20)",
-    "ys = sp.run(x65, sr, gain=pm, **cm)['waveform'].astype('float32')",
-    "yw = sp.run(x65, sr, gain=pm, attack_ms=5, release_ms=rel, **cm)['waveform'].astype('float32')",
-    "yr = sp.run(x65, sr, gain=sp.PrescriptiveGain(fc, ag), attack_ms=5, release_ms=rel, **cm)['waveform'].astype('float32')",
-    "yn = sp.run(x65, sr, gain=fitting.GainTableWDRC(fc, ag, 'nal_nl2'), attack_ms=5, release_ms=rel, **cm)['waveform'].astype('float32')",
-    "yd = sp.run(x65, sr, gain=fitting.GainTableWDRC(fc, ag, 'dsl_mio'), attack_ms=5, release_ms=rel, **cm)['waveform'].astype('float32')"
+    "x = np.asarray(xin.to_py(), dtype=float)",
+    "x = sp.frequency_compress(x, sr, f_start=1500.0, ratio=flow) if flow > 1.01 else x",
+    "xin2 = x / (np.sqrt(np.mean(x**2)) + 1e-12) * 10**((spl - 100) / 20)",       // present at chosen SPL
+    "pm = sp.PersonalizedGainMap(fc, audiogram=ag)",
+    "GAINS = {'static': (pm, False), 'wdrc': (pm, True), 'rx': (sp.PrescriptiveGain(fc, ag), True),",
+    "         'nal': (fitting.GainTableWDRC(fc, ag, 'nal_nl2'), True), 'dsl': (fitting.GainTableWDRC(fc, ag, 'dsl_mio'), True)}",
+    "def _sii(Lo):",                                                              // audibility from the run matrix (cheap)
+    "    bl = 10*np.log10(np.mean(10**(Lo/10), axis=1) + 1e-12)",
+    "    return round(float((imp*np.clip((bl-thr)/30.0, 0, 1)).sum()/imp.sum()), 2)",
+    "OUT = {'original': xin2.astype('float32')}; SII = {'original': round(sp.audibility(xin2, sr, ag), 2)}",
+    "for _k,(_g,_dyn) in GAINS.items():",
+    "    _r = sp.run(xin2, sr, gain=_g, attack_ms=(5 if _dyn else None), release_ms=(rel if _dyn else None), **cm)",
+    "    OUT[_k] = _r['waveform'].astype('float32'); SII[_k] = _sii(_r['matrix']['level_out'])",
+    "if losssim:",                                                               // 'hear it as the patient does'
+    "    LS = sp.HearingLossSim(fc, ag)",
+    "    for _k in list(OUT): OUT[_k] = sp.run(np.asarray(OUT[_k], dtype=float), sr, gain=LS, **cm)['waveform'].astype('float32')",
+    "yo=OUT['original']; ys=OUT['static']; yw=OUT['wdrc']; yr=OUT['rx']; yn=OUT['nal']; yd=OUT['dsl']",
+    "si=[SII['original'],SII['static'],SII['wdrc'],SII['rx'],SII['nal'],SII['dsl']]"
   ].join("\n");
 
-  function runEngine() {                               // -> Promise<{static,wdrc}>
-    var relMs = +$("rel").value;
+  function opts() {
+    return { rel: +$("rel").value, spl: $("level") ? +$("level").value : 65,
+             flow: $("flow") ? +$("flow").value : 1, loss: $("losssim") ? $("losssim").checked : false };
+  }
+  function runEngine() {
+    var o = opts();
     if (pyReady) {
       pyodide.globals.set("xin", input);
       pyodide.globals.set("agf", pyodide.toPy(FREQS));
       pyodide.globals.set("agv", pyodide.toPy(ag));
-      pyodide.globals.set("sr", SR); pyodide.globals.set("rel", relMs);
+      pyodide.globals.set("sr", SR); pyodide.globals.set("rel", o.rel);
+      pyodide.globals.set("spl", o.spl); pyodide.globals.set("flow", o.flow); pyodide.globals.set("losssim", o.loss);
       pyodide.runPython(PYCODE);
       var G = function (n) { return Float32Array.from(pyodide.globals.get(n).toJs()); };
-      return Promise.resolve({ static: G("ys"), wdrc: G("yw"), rx: G("yr"), nal: G("yn"), dsl: G("yd") });
+      return Promise.resolve({ original: G("yo"), static: G("ys"), wdrc: G("yw"), rx: G("yr"), nal: G("yn"), dsl: G("yd"),
+        sii: pyodide.globals.get("si").toJs(), loss: o.loss });
     }
-    var opt = { agFreqs: FREQS, agVals: ag, presentSPL: 65, nBands: 32 };     // JS fallback (no NAL/DSL)
+    var jo = { agFreqs: FREQS, agVals: ag, presentSPL: o.spl, nBands: 32 };   // JS fallback (no NAL/DSL/loss-sim)
     return Promise.resolve({
-      static: DSP.process(input, SR, Object.assign({ mode: "static" }, opt)),
-      wdrc: DSP.process(input, SR, Object.assign({ mode: "wdrc", attackMs: 5, releaseMs: relMs }, opt)),
-      rx: DSP.process(input, SR, Object.assign({ mode: "wdrc", attackMs: 5, releaseMs: relMs, prescriptive: true }, opt))
+      static: DSP.process(input, SR, Object.assign({ mode: "static" }, jo)),
+      wdrc: DSP.process(input, SR, Object.assign({ mode: "wdrc", attackMs: 5, releaseMs: o.rel }, jo)),
+      rx: DSP.process(input, SR, Object.assign({ mode: "wdrc", attackMs: 5, releaseMs: o.rel, prescriptive: true }, jo)),
+      loss: false
     });
   }
 
@@ -170,25 +197,28 @@
     bootPyodide().then(function () {
       return runEngine();
     }).then(function (r) {
-      clips.original = normalize(input.slice(), -24);
-      clips.static = normalize(r.static, -20);
-      clips.wdrc = normalize(r.wdrc, -20);
-      clips.rx = normalize(r.rx, -20);
-      clips.nal = r.nal ? normalize(r.nal, -20) : null;
-      clips.dsl = r.dsl ? normalize(r.dsl, -20) : null;
-      ["original", "static", "wdrc", "rx", "nal", "dsl"].forEach(function (k, i) {
-        var chip = document.querySelector('#tchips .chip[data-i="' + i + '"]');
-        var dl = $("dl_" + k);
+      var keys = ["original", "static", "wdrc", "rx", "nal", "dsl"];
+      if (r.loss) {                          // loss-sim: one common scale keeps the audibility differences
+        var pk = 0; keys.forEach(function (k) { if (r[k]) for (var i = 0; i < r[k].length; i++) { var a = Math.abs(r[k][i]); if (a > pk) pk = a; } });
+        var g = 0.92 / (pk + 1e-9);
+        keys.forEach(function (k) { if (!r[k]) { clips[k] = null; return; } var o = new Float32Array(r[k].length); for (var i = 0; i < r[k].length; i++) o[i] = r[k][i] * g; clips[k] = softknee(o); });
+      } else {                               // loudness-matched A/B
+        clips.original = normalize(r.original || input.slice(), -24);
+        ["static", "wdrc", "rx", "nal", "dsl"].forEach(function (k) { clips[k] = r[k] ? normalize(r[k], -20) : null; });
+      }
+      keys.forEach(function (k, i) {
+        var chip = document.querySelector('#tchips .chip[data-i="' + i + '"]'), dl = $("dl_" + k);
         if (!clips[k]) { if (chip) chip.disabled = true; if (dl) dl.style.display = "none"; return; }
         if (urls[k]) URL.revokeObjectURL(urls[k]);
-        urls[k] = URL.createObjectURL(toWav(clips[k], SR));
-        pool[i].src = urls[k]; if (chip) chip.disabled = false;
+        urls[k] = URL.createObjectURL(toWav(clips[k], SR)); pool[i].src = urls[k]; if (chip) chip.disabled = false;
         if (dl) { dl.href = urls[k]; dl.download = (fileName.replace(/\.[^.]+$/, "") || "clip") + "_" + k + ".wav"; dl.style.display = ""; }
       });
+      showSII(r.sii);
       dur = input.length / SR;
       $("dlrow").style.display = "flex"; $("tplay").disabled = false;
       active = 0; switchTo(0);
-      status(r.nal ? "done — A/B all six" : "done — NAL/DSL need the Python engine (still loading / unavailable)");
+      status(r.loss ? "done — heard through the loss (unaided degraded; aided restores it)"
+                    : (r.nal ? "done — A/B all six" : "done — NAL/DSL need the Python engine"));
       $("run").disabled = false;
     }).catch(function (e) { status("processing failed: " + e.message); console.error(e); $("run").disabled = false; });
   }

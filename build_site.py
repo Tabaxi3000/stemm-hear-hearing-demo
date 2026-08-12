@@ -172,8 +172,15 @@ TOOL_CSS = """
 .sl{display:flex;flex-direction:column;align-items:center;gap:5px;font-family:var(--mono);font-size:9px;color:var(--muted)}
 .sl input[type=range]{-webkit-appearance:slider-vertical;writing-mode:vertical-lr;direction:rtl;width:18px;height:110px;accent-color:var(--teal)}
 .sl .slv{color:var(--ink-2);font-weight:600}
-.rowctl{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted);margin:6px 0 16px;font-family:var(--mono)}
+.rowctl{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted);margin:6px 0 12px;font-family:var(--mono)}
+.rowctl label{min-width:112px}
 .rowctl input[type=range]{flex:1;accent-color:var(--teal)}
+.rowctl select{font-family:var(--mono);font-size:12px;background:var(--surface);color:var(--ink);
+  border:1px solid var(--line);border-radius:6px;padding:3px 6px}
+.chk{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:var(--ink-2);margin:4px 0 16px;cursor:pointer;line-height:1.4}
+.chk input{margin-top:2px;accent-color:var(--teal)} .chknote{color:var(--muted);font-size:11.5px}
+.siirow{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:12px;padding-top:10px;
+  border-top:1px dashed var(--line);line-height:1.7} .siirow b{color:var(--ink)}
 .runbtn{font-family:var(--mono);font-weight:600;font-size:14px;color:#fff;background:var(--teal);border:none;
   border-radius:10px;padding:10px 22px;cursor:pointer;transition:transform .06s}
 .runbtn:hover{transform:translateY(-1px)} .runbtn:disabled{opacity:.45;cursor:default;transform:none}
@@ -206,6 +213,14 @@ TOOL_HTML = f"""
             <div class="sliders" id="sliders"></div></div>
           <div class="rowctl"><label for="rel">WDRC release</label>
             <input type="range" id="rel" min="20" max="600" step="10" value="150"><span id="relv">150 ms</span></div>
+          <div class="rowctl"><label for="level">Input level</label>
+            <select id="level"><option value="50">soft &middot; 50</option><option value="65" selected>normal &middot; 65</option>
+            <option value="80">loud &middot; 80</option></select><span>dB SPL</span></div>
+          <div class="rowctl"><label for="flow">Frequency lowering</label>
+            <select id="flow"><option value="1" selected>off</option><option value="1.5">1.5&times;</option>
+            <option value="2">2&times;</option></select><span>for dead highs</span></div>
+          <label class="chk"><input type="checkbox" id="losssim"> Hear it as the patient does
+            <span class="chknote">&mdash; play the output through a simulation of the loss, so aided vs unaided shows the benefit</span></label>
           <button id="run" class="runbtn" disabled>Process</button>
           <span id="tstatus" class="status">pick an audio file to start</span>
           <div id="engine" class="engine">engine: real Python module (Pyodide) &mdash; boots on first use</div>
@@ -230,6 +245,7 @@ TOOL_HTML = f"""
           </div>
           <p class="cue"><span class="dot"></span><b class="cur" id="tcur">Original</b><span class="hint">&mdash;
             process a file, then switch to compare</span></p>
+          <div id="siirow" class="siirow" style="display:none"></div>
           <div class="dlrow" id="dlrow" style="display:none">download:
             <a id="dl_original" class="dl">original.wav</a><a id="dl_static" class="dl">static.wav</a>
             <a id="dl_wdrc" class="dl">wdrc.wav</a><a id="dl_rx" class="dl">rx.wav</a>

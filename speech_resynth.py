@@ -26,7 +26,7 @@ __all__ = [
     "GenericGainMap",
     "EXAMPLE_AUDIOGRAM", "audiogram_thresholds", "PersonalizedGainMap", "PrescriptiveGain", "PersonalizedWDRC",
     "time_stretch", "frequency_compress",
-    "run", "binaural", "make_speech_like",
+    "run", "binaural", "make_speech_like", "HearingLossSim", "audibility",
 ]
 
 # --------------------------------------------------------------------------- #
@@ -598,6 +598,43 @@ def run(x, sr, backend="butter_greenwood", n_bands=20, flo=100.0, fhi=None,
     return {"waveform": y, "fc": fc, "sr": sr, "gain_map": gmap, "measure": measure,
             "matrix": {"level_in": L_in, "level_out": L_out,
                        "gain_db": 20.0 * np.log10(np.maximum(g, eps))}}
+
+
+class HearingLossSim:
+    """Make a NORMAL-hearing listener approximately experience the loss, so 'unaided-through-loss'
+    vs 'aided-through-loss' shows the aid's actual BENEFIT (not just its output). Per band it applies
+    threshold elevation + loudness RECRUITMENT as an expansion: the audible range [threshold, UCL]
+    is mapped onto the normal range [0, UCL], so sounds below the impaired threshold become
+    inaudible and loudness grows abnormally fast above it. Use as run()'s `gain` (it's the inverse
+    idea of a compression fit). This is an illustrative simulator, not a validated model (e.g. MSBG)."""
+
+    def __init__(self, fc, audiogram=None, ucl=100.0, floor_db=-15.0):
+        self.fc = np.asarray(fc, float)
+        self.thr = audiogram_thresholds(self.fc, audiogram)
+        self.ucl = float(ucl); self.floor = float(floor_db)
+        self.span = np.maximum(self.ucl - self.thr, 5.0)          # residual range (>=5 dB)
+
+    def forward(self, L):
+        L = np.asarray(L, float)
+        per = (L - self.thr[:, None]) / self.span[:, None] * self.ucl   # recruit [thr,ucl] -> [0,ucl]
+        return np.maximum(per, self.floor)                         # below threshold -> ~inaudible
+
+
+def audibility(x, sr, audiogram, loud_ref=None, n_bands=24, flo=100.0, fhi=None):
+    """A quick speech-audibility proxy (0..1, SII-like): the importance-weighted fraction of the
+    speech's 30 dB dynamic range that sits ABOVE the listener's threshold, given the signal's
+    long-term band levels at the ear. Unaided speech into a loss scores low; a good fit scores high.
+    A proxy, not the ANSI SII (Malcolm's official package is used in the notebook)."""
+    if fhi is None:
+        fhi = 0.45 * sr
+    bands, fc = analyze(x, sr, backend="stft", flo=flo, fhi=fhi, n_bands=n_bands)
+    env = np.vstack([extract_envelope(b, sr) for b in bands])
+    ref = dbfs_ref_for_spl(100.0) if loud_ref is None else loud_ref
+    lvl = 20.0 * np.log10(np.sqrt(np.mean(env ** 2, axis=1)) / ref + 1e-9)   # long-term band level, dB SPL
+    thr = audiogram_thresholds(fc, audiogram)
+    aud = np.clip((lvl - thr) / 30.0, 0.0, 1.0)                     # fraction of 30 dB speech range audible
+    imp = np.exp(-0.5 * ((np.log10(fc) - np.log10(1800.0)) / 0.42) ** 2)     # speech-importance ~ peak 1.8 kHz
+    return float((imp * aud).sum() / imp.sum())
 
 
 # --------------------------------------------------------------------------- #
