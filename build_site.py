@@ -199,6 +199,7 @@ TOOL_CSS = """
 .dlrow{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:16px;font-family:var(--mono);font-size:11px;color:var(--muted)}
 .dl{color:var(--teal);text-decoration:none;border-bottom:1px solid color-mix(in srgb,var(--teal) 40%,transparent);cursor:pointer}
 .engine{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:12px;padding-top:9px;border-top:1px dashed var(--line)}
+.ctlnote{font-size:11px;color:var(--muted);margin:0 0 12px;line-height:1.45}
 @media (max-width:560px){.tool-grid{grid-template-columns:1fr}.agwrap{flex-direction:column}}
 """
 
@@ -229,6 +230,15 @@ TOOL_HTML = f"""
           <div class="rowctl"><label for="flow">Frequency lowering</label>
             <select id="flow"><option value="1" selected>off</option><option value="1.5">1.5&times;</option>
             <option value="2">2&times;</option></select><span>for dead highs</span></div>
+          <div class="rowctl"><label for="levels">Levels</label>
+            <select id="levels"><option value="matched" selected>matched (fair A/B)</option>
+            <option value="real">real (aid is louder)</option></select></div>
+          <div class="rowctl"><label for="gap">Air&ndash;bone gap</label>
+            <input type="range" id="gap" min="0" max="40" step="5" value="0"><span id="gapv">0 dB</span></div>
+          <div class="rowctl"><label for="ohc">OHC health</label>
+            <input type="range" id="ohc" min="0" max="100" step="10" value="0"><span id="ohcv">0%</span></div>
+          <p class="ctlnote">Air&ndash;bone gap (conductive) and healthy outer hair cells both mean less
+            recruitment &rarr; the <b>Personalized</b> fit compresses less (more linear).</p>
           <label class="chk"><input type="checkbox" id="losssim"> Hear it as the patient does
             <span class="chknote">&mdash; play the output through a simulation of the loss, so aided vs unaided shows the benefit</span></label>
           <button id="run" class="runbtn" disabled>Process</button>
@@ -245,6 +255,7 @@ TOOL_HTML = f"""
               <button class="chip c-rx" data-i="3" aria-pressed="false" disabled>Rx<em>realistic fit</em></button>
               <button class="chip c-nal" data-i="4" aria-pressed="false" disabled>NAL-NL2<em>OpenMHA-style</em></button>
               <button class="chip c-dsl" data-i="5" aria-pressed="false" disabled>DSL<em>OpenMHA-style</em></button>
+              <button class="chip c-per" data-i="6" aria-pressed="false" disabled>Pers<em>bone/OHC-aware</em></button>
             </span>
           </div>
           <div class="transport">
@@ -259,7 +270,8 @@ TOOL_HTML = f"""
           <div class="dlrow" id="dlrow" style="display:none">download:
             <a id="dl_original" class="dl">original.wav</a><a id="dl_static" class="dl">static.wav</a>
             <a id="dl_wdrc" class="dl">wdrc.wav</a><a id="dl_rx" class="dl">rx.wav</a>
-            <a id="dl_nal" class="dl">nal.wav</a><a id="dl_dsl" class="dl">dsl.wav</a></div>
+            <a id="dl_nal" class="dl">nal.wav</a><a id="dl_dsl" class="dl">dsl.wav</a>
+            <a id="dl_per" class="dl">personalized.wav</a></div>
         </div>
       </div>
     </section>"""
@@ -364,6 +376,7 @@ figure.paper figcaption{{font-family:var(--mono);font-size:10px;letter-spacing:.
 .c-left[aria-pressed="true"]{{background:var(--blue)}} .c-right[aria-pressed="true"]{{background:var(--red)}}
 .c-bin[aria-pressed="true"]{{background:var(--teal)}} .c-rx[aria-pressed="true"]{{background:var(--rx)}}
 .c-nal[aria-pressed="true"]{{background:var(--nal)}} .c-dsl[aria-pressed="true"]{{background:var(--dsl)}} .c-cam[aria-pressed="true"]{{background:var(--cam)}}
+.c-per[aria-pressed="true"]{{background:var(--cam)}}
 .omfig{{max-width:400px;margin:22px 0}}
 
 .transport{{display:flex;align-items:center;gap:15px;margin:16px 0 0}}

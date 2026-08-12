@@ -28,7 +28,7 @@
   function showSII(si) {                               // audibility (SII proxy) per condition
     var el = $("siirow"); if (!el) return;
     if (!si) { el.style.display = "none"; return; }
-    var L = ["Original", "Static", "WDRC", "Rx", "NAL", "DSL"];
+    var L = ["Original","Static","WDRC","Rx","NAL","DSL","Pers"];
     el.innerHTML = '<b>Audibility (SII proxy, 0–1):</b> ' +
       L.map(function (n, i) { return n + " " + (si[i] != null ? si[i].toFixed(2) : "–"); }).join("  ·  ");
     el.style.display = "";
@@ -114,7 +114,8 @@
     "xin2 = x / (np.sqrt(np.mean(x**2)) + 1e-12) * 10**((spl - 100) / 20)",       // present at chosen SPL
     "pm = sp.PersonalizedGainMap(fc, audiogram=ag)",
     "GAINS = {'static': (pm, False), 'wdrc': (pm, True), 'rx': (sp.PrescriptiveGain(fc, ag), True),",
-    "         'nal': (fitting.GainTableWDRC(fc, ag, 'nal_nl2'), True), 'dsl': (fitting.GainTableWDRC(fc, ag, 'dsl_mio'), True)}",
+    "         'nal': (fitting.GainTableWDRC(fc, ag, 'nal_nl2'), True), 'dsl': (fitting.GainTableWDRC(fc, ag, 'dsl_mio'), True),",
+    "         'per': (sp.PersonalizedWDRC(fc, audiogram=ag, airbone_gap=gap, ohc_health=ohc), True)}",   // bone/OHC-aware
     "def _sii(Lo):",                                                              // audibility from the run matrix (cheap)
     "    bl = 10*np.log10(np.mean(10**(Lo/10), axis=1) + 1e-12)",
     "    return round(float((imp*np.clip((bl-thr)/30.0, 0, 1)).sum()/imp.sum()), 2)",
@@ -125,13 +126,15 @@
     "if losssim:",                                                               // 'hear it as the patient does'
     "    LS = sp.HearingLossSim(fc, ag)",
     "    for _k in list(OUT): OUT[_k] = sp.run(np.asarray(OUT[_k], dtype=float), sr, gain=LS, **cm)['waveform'].astype('float32')",
-    "yo=OUT['original']; ys=OUT['static']; yw=OUT['wdrc']; yr=OUT['rx']; yn=OUT['nal']; yd=OUT['dsl']",
-    "si=[SII['original'],SII['static'],SII['wdrc'],SII['rx'],SII['nal'],SII['dsl']]"
+    "yo=OUT['original']; ys=OUT['static']; yw=OUT['wdrc']; yr=OUT['rx']; yn=OUT['nal']; yd=OUT['dsl']; yp=OUT['per']",
+    "si=[SII['original'],SII['static'],SII['wdrc'],SII['rx'],SII['nal'],SII['dsl'],SII['per']]"
   ].join("\n");
 
   function opts() {
     return { rel: +$("rel").value, spl: $("level") ? +$("level").value : 65,
-             flow: $("flow") ? +$("flow").value : 1, loss: $("losssim") ? $("losssim").checked : false };
+             flow: $("flow") ? +$("flow").value : 1, loss: $("losssim") ? $("losssim").checked : false,
+             gap: $("gap") ? +$("gap").value : 0, ohc: $("ohc") ? +$("ohc").value / 100 : 0,
+             levels: !!($("levels") && $("levels").value === "real") };
   }
   function runEngine() {
     var o = opts();
@@ -141,17 +144,18 @@
       pyodide.globals.set("agv", pyodide.toPy(ag));
       pyodide.globals.set("sr", SR); pyodide.globals.set("rel", o.rel);
       pyodide.globals.set("spl", o.spl); pyodide.globals.set("flow", o.flow); pyodide.globals.set("losssim", o.loss);
+      pyodide.globals.set("gap", o.gap); pyodide.globals.set("ohc", o.ohc);
       pyodide.runPython(PYCODE);
       var G = function (n) { return Float32Array.from(pyodide.globals.get(n).toJs()); };
-      return Promise.resolve({ original: G("yo"), static: G("ys"), wdrc: G("yw"), rx: G("yr"), nal: G("yn"), dsl: G("yd"),
-        sii: pyodide.globals.get("si").toJs(), loss: o.loss });
+      return Promise.resolve({ original: G("yo"), static: G("ys"), wdrc: G("yw"), rx: G("yr"), nal: G("yn"), dsl: G("yd"), per: G("yp"),
+        sii: pyodide.globals.get("si").toJs(), loss: o.loss, levels: o.levels });
     }
-    var jo = { agFreqs: FREQS, agVals: ag, presentSPL: o.spl, nBands: 32 };   // JS fallback (no NAL/DSL/loss-sim)
+    var jo = { agFreqs: FREQS, agVals: ag, presentSPL: o.spl, nBands: 32 };   // JS fallback (no NAL/DSL/Personalized/loss-sim)
     return Promise.resolve({
       static: DSP.process(input, SR, Object.assign({ mode: "static" }, jo)),
       wdrc: DSP.process(input, SR, Object.assign({ mode: "wdrc", attackMs: 5, releaseMs: o.rel }, jo)),
       rx: DSP.process(input, SR, Object.assign({ mode: "wdrc", attackMs: 5, releaseMs: o.rel, prescriptive: true }, jo)),
-      loss: false
+      loss: false, levels: o.levels
     });
   }
 
@@ -188,7 +192,7 @@
     if (i === active || !pool[i]) return; var f = pool[active], t = pool[i];
     if (f) { f.pause(); t.currentTime = f.currentTime; } active = i;
     document.querySelectorAll("#tchips .chip").forEach(function (c) { c.setAttribute("aria-pressed", c.dataset.i == i); });
-    $("tcur").textContent = ["Original", "Static", "WDRC", "Rx", "NAL-NL2", "DSL"][i]; if (on) t.play();
+    $("tcur").textContent = ["Original","Static","WDRC","Rx","NAL-NL2","DSL","Personalized"][i]; if (on) t.play();
   }
 
   function process() {
@@ -197,14 +201,14 @@
     bootPyodide().then(function () {
       return runEngine();
     }).then(function (r) {
-      var keys = ["original", "static", "wdrc", "rx", "nal", "dsl"];
-      if (r.loss) {                          // loss-sim: one common scale keeps the audibility differences
+      var keys = ["original", "static", "wdrc", "rx", "nal", "dsl", "per"];
+      if (r.loss || r.levels) {              // loss-sim OR 'real levels': one common scale keeps the natural differences
         var pk = 0; keys.forEach(function (k) { if (r[k]) for (var i = 0; i < r[k].length; i++) { var a = Math.abs(r[k][i]); if (a > pk) pk = a; } });
         var g = 0.92 / (pk + 1e-9);
         keys.forEach(function (k) { if (!r[k]) { clips[k] = null; return; } var o = new Float32Array(r[k].length); for (var i = 0; i < r[k].length; i++) o[i] = r[k][i] * g; clips[k] = softknee(o); });
       } else {                               // loudness-matched A/B
         clips.original = normalize(r.original || input.slice(), -24);
-        ["static", "wdrc", "rx", "nal", "dsl"].forEach(function (k) { clips[k] = r[k] ? normalize(r[k], -20) : null; });
+        ["static", "wdrc", "rx", "nal", "dsl", "per"].forEach(function (k) { clips[k] = r[k] ? normalize(r[k], -20) : null; });
       }
       keys.forEach(function (k, i) {
         var chip = document.querySelector('#tchips .chip[data-i="' + i + '"]'), dl = $("dl_" + k);
@@ -217,7 +221,7 @@
       dur = input.length / SR;
       $("dlrow").style.display = "flex"; $("tplay").disabled = false;
       active = 0; switchTo(0);
-      status(r.loss ? "done — heard through the loss (unaided degraded; aided restores it)"
+      status(r.loss ? "done — heard through the loss (unaided degraded; aided restores it)" : r.levels ? "done — real levels (the aid makes it louder)"
                     : (r.nal ? "done — A/B all six" : "done — NAL/DSL need the Python engine"));
       $("run").disabled = false;
     }).catch(function (e) { status("processing failed: " + e.message); console.error(e); $("run").disabled = false; });
@@ -229,10 +233,12 @@
     buildSliders(); drawAg();
     $("tf").addEventListener("change", function (e) { if (e.target.files[0]) loadFile(e.target.files[0]); });
     $("rel").addEventListener("input", function () { $("relv").textContent = $("rel").value + " ms"; });
+    if ($("gap")) $("gap").addEventListener("input", function () { $("gapv").textContent = $("gap").value + " dB"; });
+    if ($("ohc")) $("ohc").addEventListener("input", function () { $("ohcv").textContent = $("ohc").value + "%"; });
     document.querySelectorAll("[data-preset]").forEach(function (b) {
       b.addEventListener("click", function () { preset(b.dataset.preset); }); });
     $("run").addEventListener("click", process);
-    for (var i = 0; i < 6; i++) { pool[i] = new Audio(); pool[i].preload = "auto"; }
+    for (var i = 0; i < 7; i++) { pool[i] = new Audio(); pool[i].preload = "auto"; }
     pool.forEach(function (a) { a.addEventListener("ended", function () { setOn(false);
       pool.forEach(function (x) { x.currentTime = 0; }); $("tfill").style.width = "0%"; $("tseek").value = 0; }); });
     $("tplay").addEventListener("click", function () { if (!pool[active].src) return;
