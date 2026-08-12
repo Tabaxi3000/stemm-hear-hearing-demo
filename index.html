@@ -165,6 +165,16 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
   border:1px solid var(--line);border-radius:10px;padding:11px 14px;margin:0 0 18px;line-height:1.5}
 .quickstart b{color:var(--ink)}
 .spec{display:block;width:100%;height:auto;margin-top:12px;background:var(--paper);border:1px solid var(--line);border-radius:8px}
+.blindstart{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink);background:transparent;border:1.5px solid var(--line);border-radius:9px;padding:8px 14px;cursor:pointer;margin-top:14px}
+.blindstart:hover:not(:disabled){border-color:var(--teal);color:var(--teal)} .blindstart:disabled{opacity:.45;cursor:default}
+.blind{margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.blindhdr{font-size:12.5px;color:var(--ink-2);margin-bottom:12px} .blindhdr b{color:var(--ink)}
+.blindctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.bbtn{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--ink);background:var(--surface);border:1.5px solid var(--line);border-radius:9px;padding:7px 13px;cursor:pointer}
+.bbtn:hover{border-color:var(--teal)} .bbtn.pref{color:#fff;background:var(--teal);border-color:transparent}
+.bbtn.done{margin-top:12px;background:transparent;color:var(--muted);font-size:11px}
+.bsep{width:1px;align-self:stretch;background:var(--line);margin:2px 4px}
+.breveal{font-size:12.5px;color:var(--teal);min-height:18px;margin-top:10px}
 @media (max-width:560px){.tool-grid{grid-template-columns:1fr}.agwrap{flex-direction:column}}
 
 @media (max-width:840px){
@@ -483,6 +493,17 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
             <a id="dl_wdrc" class="dl">wdrc.wav</a><a id="dl_rx" class="dl">rx.wav</a>
             <a id="dl_nal" class="dl">nal.wav</a><a id="dl_dsl" class="dl">dsl.wav</a>
             <a id="dl_per" class="dl">personalized.wav</a></div>
+          <button id="blindbtn" class="blindstart" disabled>Blind A/B preference test</button>
+          <div class="blind" id="blindpanel" style="display:none">
+            <div class="blindhdr">Blind A/B &mdash; two unlabeled fits, pick the one you prefer &middot; trial <b id="btrial">1</b> <span id="btally"></span></div>
+            <div class="blindctl">
+              <button id="bA" class="bbtn">&#9654;&nbsp;A</button><button id="bB" class="bbtn">&#9654;&nbsp;B</button>
+              <span class="bsep"></span>
+              <button id="bprefA" class="bbtn pref">prefer&nbsp;A</button><button id="bprefB" class="bbtn pref">prefer&nbsp;B</button>
+              <button id="bskip" class="bbtn">skip</button></div>
+            <div id="breveal" class="breveal"></div>
+            <button id="bdone" class="bbtn done">done &mdash; download CSV</button>
+          </div>
         </div>
       </div>
     </section>
@@ -1002,11 +1023,42 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
       specCache = {}; showMetrics(r.sii, r.stoi, r.err);
       dur = input.length / SR;
       $("dlrow").style.display = "flex"; $("tplay").disabled = false;
+      if ($("blindbtn")) $("blindbtn").disabled = false;
       active = 0; switchTo(0); drawSpec();
       status(r.loss ? "done — heard through the loss (unaided degraded; aided restores it)" : r.levels ? "done — real levels (the aid makes it louder)"
                     : (r.nal ? "done — A/B all six" : "done — NAL/DSL need the Python engine"));
       $("run").disabled = false;
     }).catch(function (e) { status("processing failed: " + e.message); console.error(e); $("run").disabled = false; });
+  }
+
+  // ---- blind A/B preference test -----------------------------------------------------
+  var blind = { A: null, B: null, trials: [], ba: null, bb: null, n: 0 };
+  var LAB = { original: "Original", static: "Static", wdrc: "WDRC", rx: "Rx", nal: "NAL-NL2", dsl: "DSL", per: "Personalized" };
+  function blindNext() {
+    var ks = KEYS.filter(function (k) { return clips[k]; }); if (ks.length < 2) return;
+    var i = Math.floor(Math.random() * ks.length), j; do { j = Math.floor(Math.random() * ks.length); } while (j === i);
+    blind.A = ks[i]; blind.B = ks[j];
+    if (blind.ba.src) URL.revokeObjectURL(blind.ba.src); if (blind.bb.src) URL.revokeObjectURL(blind.bb.src);
+    blind.ba.src = URL.createObjectURL(toWav(clips[blind.A], SR)); blind.bb.src = URL.createObjectURL(toWav(clips[blind.B], SR));
+    blind.n++; $("btrial").textContent = blind.n; $("breveal").textContent = "";
+  }
+  function blindPlay(which) {
+    var a = which === "A" ? blind.ba : blind.bb, o = which === "A" ? blind.bb : blind.ba;
+    o.pause(); a.currentTime = o.currentTime || 0; a.play();
+  }
+  function blindPrefer(which) {
+    var win = which === "A" ? blind.A : blind.B, lose = which === "A" ? blind.B : blind.A, o = opts();
+    blind.trials.push({ trial: blind.n, prefer: win, over: lose, audiogram: ag.join("/"),
+      level: o.spl, noise: o.noise, ntype: o.ntype, reverb: o.rev, nr: o.nr, prog: o.prog });
+    try { localStorage.setItem("blind_ab", JSON.stringify(blind.trials)); } catch (e) {}
+    $("breveal").innerHTML = "You preferred <b>" + LAB[win] + "</b> over " + LAB[lose] + ".  (" + blind.trials.length + " logged)";
+    blind.ba.pause(); blind.bb.pause(); setTimeout(blindNext, 1300);
+  }
+  function blindCSV() {
+    var rows = [["trial", "preferred", "over", "audiogram", "level_dB", "noise_SNR", "noise_type", "reverb", "NR", "program"]];
+    blind.trials.forEach(function (t) { rows.push([t.trial, t.prefer, t.over, t.audiogram, t.level, t.noise, t.ntype, t.reverb, t.nr, t.prog]); });
+    var url = URL.createObjectURL(new Blob([rows.map(function (r) { return r.join(","); }).join("\n")], { type: "text/csv" }));
+    var a = document.createElement("a"); a.href = url; a.download = "blind_ab_" + Date.now() + ".csv"; a.click();
   }
 
   // ---- init --------------------------------------------------------------------------
@@ -1021,6 +1073,16 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
       b.addEventListener("click", function () { preset(b.dataset.preset); }); });
     $("run").addEventListener("click", process);
     for (var i = 0; i < 7; i++) { pool[i] = new Audio(); pool[i].preload = "auto"; }
+    blind.ba = new Audio(); blind.bb = new Audio();
+    try { var _sv = JSON.parse(localStorage.getItem("blind_ab") || "[]"); if (_sv.length) blind.trials = _sv; } catch (e) {}
+    if ($("blindbtn")) $("blindbtn").addEventListener("click", function () {
+      $("blindpanel").style.display = "block"; $("blindbtn").style.display = "none"; blindNext(); });
+    if ($("bA")) $("bA").addEventListener("click", function () { blindPlay("A"); });
+    if ($("bB")) $("bB").addEventListener("click", function () { blindPlay("B"); });
+    if ($("bprefA")) $("bprefA").addEventListener("click", function () { blindPrefer("A"); });
+    if ($("bprefB")) $("bprefB").addEventListener("click", function () { blindPrefer("B"); });
+    if ($("bskip")) $("bskip").addEventListener("click", blindNext);
+    if ($("bdone")) $("bdone").addEventListener("click", blindCSV);
     pool.forEach(function (a) { a.addEventListener("ended", function () { setOn(false);
       pool.forEach(function (x) { x.currentTime = 0; }); $("tfill").style.width = "0%"; $("tseek").value = 0; }); });
     $("tplay").addEventListener("click", function () { if (!pool[active].src) return;

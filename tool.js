@@ -287,11 +287,42 @@
       specCache = {}; showMetrics(r.sii, r.stoi, r.err);
       dur = input.length / SR;
       $("dlrow").style.display = "flex"; $("tplay").disabled = false;
+      if ($("blindbtn")) $("blindbtn").disabled = false;
       active = 0; switchTo(0); drawSpec();
       status(r.loss ? "done — heard through the loss (unaided degraded; aided restores it)" : r.levels ? "done — real levels (the aid makes it louder)"
                     : (r.nal ? "done — A/B all six" : "done — NAL/DSL need the Python engine"));
       $("run").disabled = false;
     }).catch(function (e) { status("processing failed: " + e.message); console.error(e); $("run").disabled = false; });
+  }
+
+  // ---- blind A/B preference test -----------------------------------------------------
+  var blind = { A: null, B: null, trials: [], ba: null, bb: null, n: 0 };
+  var LAB = { original: "Original", static: "Static", wdrc: "WDRC", rx: "Rx", nal: "NAL-NL2", dsl: "DSL", per: "Personalized" };
+  function blindNext() {
+    var ks = KEYS.filter(function (k) { return clips[k]; }); if (ks.length < 2) return;
+    var i = Math.floor(Math.random() * ks.length), j; do { j = Math.floor(Math.random() * ks.length); } while (j === i);
+    blind.A = ks[i]; blind.B = ks[j];
+    if (blind.ba.src) URL.revokeObjectURL(blind.ba.src); if (blind.bb.src) URL.revokeObjectURL(blind.bb.src);
+    blind.ba.src = URL.createObjectURL(toWav(clips[blind.A], SR)); blind.bb.src = URL.createObjectURL(toWav(clips[blind.B], SR));
+    blind.n++; $("btrial").textContent = blind.n; $("breveal").textContent = "";
+  }
+  function blindPlay(which) {
+    var a = which === "A" ? blind.ba : blind.bb, o = which === "A" ? blind.bb : blind.ba;
+    o.pause(); a.currentTime = o.currentTime || 0; a.play();
+  }
+  function blindPrefer(which) {
+    var win = which === "A" ? blind.A : blind.B, lose = which === "A" ? blind.B : blind.A, o = opts();
+    blind.trials.push({ trial: blind.n, prefer: win, over: lose, audiogram: ag.join("/"),
+      level: o.spl, noise: o.noise, ntype: o.ntype, reverb: o.rev, nr: o.nr, prog: o.prog });
+    try { localStorage.setItem("blind_ab", JSON.stringify(blind.trials)); } catch (e) {}
+    $("breveal").innerHTML = "You preferred <b>" + LAB[win] + "</b> over " + LAB[lose] + ".  (" + blind.trials.length + " logged)";
+    blind.ba.pause(); blind.bb.pause(); setTimeout(blindNext, 1300);
+  }
+  function blindCSV() {
+    var rows = [["trial", "preferred", "over", "audiogram", "level_dB", "noise_SNR", "noise_type", "reverb", "NR", "program"]];
+    blind.trials.forEach(function (t) { rows.push([t.trial, t.prefer, t.over, t.audiogram, t.level, t.noise, t.ntype, t.reverb, t.nr, t.prog]); });
+    var url = URL.createObjectURL(new Blob([rows.map(function (r) { return r.join(","); }).join("\n")], { type: "text/csv" }));
+    var a = document.createElement("a"); a.href = url; a.download = "blind_ab_" + Date.now() + ".csv"; a.click();
   }
 
   // ---- init --------------------------------------------------------------------------
@@ -306,6 +337,16 @@
       b.addEventListener("click", function () { preset(b.dataset.preset); }); });
     $("run").addEventListener("click", process);
     for (var i = 0; i < 7; i++) { pool[i] = new Audio(); pool[i].preload = "auto"; }
+    blind.ba = new Audio(); blind.bb = new Audio();
+    try { var _sv = JSON.parse(localStorage.getItem("blind_ab") || "[]"); if (_sv.length) blind.trials = _sv; } catch (e) {}
+    if ($("blindbtn")) $("blindbtn").addEventListener("click", function () {
+      $("blindpanel").style.display = "block"; $("blindbtn").style.display = "none"; blindNext(); });
+    if ($("bA")) $("bA").addEventListener("click", function () { blindPlay("A"); });
+    if ($("bB")) $("bB").addEventListener("click", function () { blindPlay("B"); });
+    if ($("bprefA")) $("bprefA").addEventListener("click", function () { blindPrefer("A"); });
+    if ($("bprefB")) $("bprefB").addEventListener("click", function () { blindPrefer("B"); });
+    if ($("bskip")) $("bskip").addEventListener("click", blindNext);
+    if ($("bdone")) $("bdone").addEventListener("click", blindCSV);
     pool.forEach(function (a) { a.addEventListener("ended", function () { setOn(false);
       pool.forEach(function (x) { x.currentTime = 0; }); $("tfill").style.width = "0%"; $("tseek").value = 0; }); });
     $("tplay").addEventListener("click", function () { if (!pool[active].src) return;

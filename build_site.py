@@ -204,6 +204,16 @@ TOOL_CSS = """
   border:1px solid var(--line);border-radius:10px;padding:11px 14px;margin:0 0 18px;line-height:1.5}
 .quickstart b{color:var(--ink)}
 .spec{display:block;width:100%;height:auto;margin-top:12px;background:var(--paper);border:1px solid var(--line);border-radius:8px}
+.blindstart{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink);background:transparent;border:1.5px solid var(--line);border-radius:9px;padding:8px 14px;cursor:pointer;margin-top:14px}
+.blindstart:hover:not(:disabled){border-color:var(--teal);color:var(--teal)} .blindstart:disabled{opacity:.45;cursor:default}
+.blind{margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.blindhdr{font-size:12.5px;color:var(--ink-2);margin-bottom:12px} .blindhdr b{color:var(--ink)}
+.blindctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.bbtn{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--ink);background:var(--surface);border:1.5px solid var(--line);border-radius:9px;padding:7px 13px;cursor:pointer}
+.bbtn:hover{border-color:var(--teal)} .bbtn.pref{color:#fff;background:var(--teal);border-color:transparent}
+.bbtn.done{margin-top:12px;background:transparent;color:var(--muted);font-size:11px}
+.bsep{width:1px;align-self:stretch;background:var(--line);margin:2px 4px}
+.breveal{font-size:12.5px;color:var(--teal);min-height:18px;margin-top:10px}
 @media (max-width:560px){.tool-grid{grid-template-columns:1fr}.agwrap{flex-direction:column}}
 """
 
@@ -295,6 +305,17 @@ TOOL_HTML = f"""
             <a id="dl_wdrc" class="dl">wdrc.wav</a><a id="dl_rx" class="dl">rx.wav</a>
             <a id="dl_nal" class="dl">nal.wav</a><a id="dl_dsl" class="dl">dsl.wav</a>
             <a id="dl_per" class="dl">personalized.wav</a></div>
+          <button id="blindbtn" class="blindstart" disabled>Blind A/B preference test</button>
+          <div class="blind" id="blindpanel" style="display:none">
+            <div class="blindhdr">Blind A/B &mdash; two unlabeled fits, pick the one you prefer &middot; trial <b id="btrial">1</b> <span id="btally"></span></div>
+            <div class="blindctl">
+              <button id="bA" class="bbtn">&#9654;&nbsp;A</button><button id="bB" class="bbtn">&#9654;&nbsp;B</button>
+              <span class="bsep"></span>
+              <button id="bprefA" class="bbtn pref">prefer&nbsp;A</button><button id="bprefB" class="bbtn pref">prefer&nbsp;B</button>
+              <button id="bskip" class="bbtn">skip</button></div>
+            <div id="breveal" class="breveal"></div>
+            <button id="bdone" class="bbtn done">done &mdash; download CSV</button>
+          </div>
         </div>
       </div>
     </section>"""
