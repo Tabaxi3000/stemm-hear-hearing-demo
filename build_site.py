@@ -200,6 +200,7 @@ TOOL_CSS = """
 .dl{color:var(--teal);text-decoration:none;border-bottom:1px solid color-mix(in srgb,var(--teal) 40%,transparent);cursor:pointer}
 .engine{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:12px;padding-top:9px;border-top:1px dashed var(--line)}
 .ctlnote{font-size:11px;color:var(--muted);margin:0 0 12px;line-height:1.45}
+.spec{display:block;width:100%;height:auto;margin-top:12px;background:var(--paper);border:1px solid var(--line);border-radius:8px}
 @media (max-width:560px){.tool-grid{grid-template-columns:1fr}.agwrap{flex-direction:column}}
 """
 
@@ -239,6 +240,11 @@ TOOL_HTML = f"""
             <input type="range" id="ohc" min="0" max="100" step="10" value="0"><span id="ohcv">0%</span></div>
           <p class="ctlnote">Air&ndash;bone gap (conductive) and healthy outer hair cells both mean less
             recruitment &rarr; the <b>Personalized</b> fit compresses less (more linear).</p>
+          <div class="rowctl"><label for="noise">Add noise</label>
+            <select id="noise"><option value="-1" selected>off</option><option value="10">+10 dB SNR</option>
+            <option value="5">+5 dB SNR</option><option value="0">0 dB SNR</option></select><span>speech-shaped</span></div>
+          <label class="chk"><input type="checkbox" id="nr"> Noise reduction (aid-side denoiser)
+            <span class="chknote">&mdash; suppresses steady noise between words; hear it help vs the unaided noisy Original</span></label>
           <label class="chk"><input type="checkbox" id="losssim"> Hear it as the patient does
             <span class="chknote">&mdash; play the output through a simulation of the loss, so aided vs unaided shows the benefit</span></label>
           <button id="run" class="runbtn" disabled>Process</button>
@@ -267,6 +273,7 @@ TOOL_HTML = f"""
           <p class="cue"><span class="dot"></span><b class="cur" id="tcur">Original</b><span class="hint">&mdash;
             process a file, then switch to compare</span></p>
           <div id="siirow" class="siirow" style="display:none"></div>
+          <canvas id="spec" width="460" height="150" class="spec" title="Long-term spectrum: dashed = original, solid = selected"></canvas>
           <div class="dlrow" id="dlrow" style="display:none">download:
             <a id="dl_original" class="dl">original.wav</a><a id="dl_static" class="dl">static.wav</a>
             <a id="dl_wdrc" class="dl">wdrc.wav</a><a id="dl_rx" class="dl">rx.wav</a>

@@ -8,6 +8,7 @@
   var ag = [20, 25, 30, 40, 55, 65];
   var SR = 32000, CAP = 10;                            // process up to 10 s (each fit is a full DSP pass)
   var input = null, fileName = "", urls = {}, clips = {};
+  var KEYS = ["original", "static", "wdrc", "rx", "nal", "dsl", "per"], specCache = {};
   var pyodide = null, pyReady = false, pyBooting = false, pyFailed = false;
   var $ = function (id) { return document.getElementById(id); };
   function status(t) { var e = $("tstatus"); if (e) e.textContent = t; }
@@ -32,6 +33,38 @@
     el.innerHTML = '<b>Audibility (SII proxy, 0–1):</b> ' +
       L.map(function (n, i) { return n + " " + (si[i] != null ? si[i].toFixed(2) : "–"); }).join("  ·  ");
     el.style.display = "";
+  }
+  function ltas(a) {                                   // Welch long-term magnitude spectrum (dB) via DSP.fft
+    if (typeof DSP === "undefined" || !a || a.length < 4096) return null;
+    var W = 4096, Hh = 2048, re = new Float64Array(W), im = new Float64Array(W), acc = new Float64Array(W / 2 + 1), nf = 0, i, k, s;
+    for (s = 0; s + W <= a.length; s += Hh) {
+      for (i = 0; i < W; i++) { re[i] = a[s + i] * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / W)); im[i] = 0; }
+      DSP.fft(re, im, false);
+      for (k = 0; k <= W / 2; k++) acc[k] += re[k] * re[k] + im[k] * im[k];
+      nf++;
+    }
+    var out = new Float64Array(W / 2 + 1); for (k = 0; k <= W / 2; k++) out[k] = 10 * Math.log10(acc[k] / (nf || 1) + 1e-12);
+    return out;
+  }
+  function drawSpec() {                                 // dashed = original, solid = selected condition
+    var c = $("spec"); if (!c) return; var g = c.getContext("2d"), W = c.width, H = c.height;
+    g.clearRect(0, 0, W, H);
+    var cs = getComputedStyle(document.documentElement);
+    var mut = (cs.getPropertyValue("--muted") || "#889").trim(), teal = (cs.getPropertyValue("--teal") || "#227").trim(),
+        line = (cs.getPropertyValue("--line") || "#ddd").trim();
+    var fmin = 100, fmax = SR / 2, NB = 4096, pad = 26;
+    var xf = function (f) { return pad + (Math.log10(f) - Math.log10(fmin)) / (Math.log10(fmax) - Math.log10(fmin)) * (W - pad - 6); };
+    g.fillStyle = mut; g.font = "9px ui-monospace,monospace"; g.textAlign = "center";
+    [100, 1000, 10000].forEach(function (f) { if (f <= fmax) { var xx = xf(f); g.strokeStyle = line; g.globalAlpha = .4; g.beginPath(); g.moveTo(xx, 4); g.lineTo(xx, H - 12); g.stroke(); g.globalAlpha = 1; g.fillText(f >= 1000 ? f / 1000 + "k" : f, xx, H - 2); } });
+    function plot(spec, color, dashed) {
+      if (!spec) return; g.strokeStyle = color; g.lineWidth = dashed ? 1 : 1.8; g.setLineDash(dashed ? [3, 3] : []); g.beginPath(); var first = true;
+      for (var k = 1; k <= NB / 2; k++) { var f = k * SR / NB; if (f < fmin || f > fmax) continue;
+        var y = H - 14 - ((spec[k] + 100) / 75) * (H - 22); y = Math.max(3, Math.min(H - 13, y)); var xx = xf(f);
+        if (first) { g.moveTo(xx, y); first = false; } else g.lineTo(xx, y); }
+      g.stroke(); g.setLineDash([]);
+    }
+    if (clips.original) plot(specCache.original || (specCache.original = ltas(clips.original)), mut, true);
+    var ak = KEYS[active]; if (clips[ak]) plot(specCache[ak] || (specCache[ak] = ltas(clips[ak])), teal, false);
   }
   function toWav(f32, sr) {
     var n = f32.length, buf = new ArrayBuffer(44 + n * 2), dv = new DataView(buf), i;
@@ -111,7 +144,11 @@
     "          loud_ref=sp.dbfs_ref_for_spl(100.0), match_rms=False, gate_db=-45.0, gate_knee_db=18.0)",
     "x = np.asarray(xin.to_py(), dtype=float)",
     "x = sp.frequency_compress(x, sr, f_start=1500.0, ratio=flow) if flow > 1.01 else x",
-    "xin2 = x / (np.sqrt(np.mean(x**2)) + 1e-12) * 10**((spl - 100) / 20)",       // present at chosen SPL
+    "if noise >= 0: x = sp.add_noise(x, float(noise), 'ssn')",                    // speech-in-noise
+    "xin2 = x / (np.sqrt(np.mean(x**2)) + 1e-12) * 10**((spl - 100) / 20)",       // noisy, at chosen SPL
+    "xfit = xin2",                                                                // aid input
+    "if nr:",                                                                     // noise reduction (aid-side)
+    "    xfit = sp.denoise(xin2, sr); xfit = xfit / (np.sqrt(np.mean(xfit**2)) + 1e-12) * 10**((spl - 100) / 20)",
     "pm = sp.PersonalizedGainMap(fc, audiogram=ag)",
     "GAINS = {'static': (pm, False), 'wdrc': (pm, True), 'rx': (sp.PrescriptiveGain(fc, ag), True),",
     "         'nal': (fitting.GainTableWDRC(fc, ag, 'nal_nl2'), True), 'dsl': (fitting.GainTableWDRC(fc, ag, 'dsl_mio'), True),",
@@ -121,7 +158,7 @@
     "    return round(float((imp*np.clip((bl-thr)/30.0, 0, 1)).sum()/imp.sum()), 2)",
     "OUT = {'original': xin2.astype('float32')}; SII = {'original': round(sp.audibility(xin2, sr, ag), 2)}",
     "for _k,(_g,_dyn) in GAINS.items():",
-    "    _r = sp.run(xin2, sr, gain=_g, attack_ms=(5 if _dyn else None), release_ms=(rel if _dyn else None), **cm)",
+    "    _r = sp.run(xfit, sr, gain=_g, attack_ms=(5 if _dyn else None), release_ms=(rel if _dyn else None), **cm)",
     "    OUT[_k] = _r['waveform'].astype('float32'); SII[_k] = _sii(_r['matrix']['level_out'])",
     "if losssim:",                                                               // 'hear it as the patient does'
     "    LS = sp.HearingLossSim(fc, ag)",
@@ -134,7 +171,8 @@
     return { rel: +$("rel").value, spl: $("level") ? +$("level").value : 65,
              flow: $("flow") ? +$("flow").value : 1, loss: $("losssim") ? $("losssim").checked : false,
              gap: $("gap") ? +$("gap").value : 0, ohc: $("ohc") ? +$("ohc").value / 100 : 0,
-             levels: !!($("levels") && $("levels").value === "real") };
+             levels: !!($("levels") && $("levels").value === "real"),
+             noise: $("noise") ? +$("noise").value : -1, nr: !!($("nr") && $("nr").checked) };
   }
   function runEngine() {
     var o = opts();
@@ -145,6 +183,7 @@
       pyodide.globals.set("sr", SR); pyodide.globals.set("rel", o.rel);
       pyodide.globals.set("spl", o.spl); pyodide.globals.set("flow", o.flow); pyodide.globals.set("losssim", o.loss);
       pyodide.globals.set("gap", o.gap); pyodide.globals.set("ohc", o.ohc);
+      pyodide.globals.set("noise", o.noise); pyodide.globals.set("nr", o.nr);
       pyodide.runPython(PYCODE);
       var G = function (n) { return Float32Array.from(pyodide.globals.get(n).toJs()); };
       return Promise.resolve({ original: G("yo"), static: G("ys"), wdrc: G("yw"), rx: G("yr"), nal: G("yn"), dsl: G("yd"), per: G("yp"),
@@ -193,6 +232,7 @@
     if (f) { f.pause(); t.currentTime = f.currentTime; } active = i;
     document.querySelectorAll("#tchips .chip").forEach(function (c) { c.setAttribute("aria-pressed", c.dataset.i == i); });
     $("tcur").textContent = ["Original","Static","WDRC","Rx","NAL-NL2","DSL","Personalized"][i]; if (on) t.play();
+    drawSpec();
   }
 
   function process() {
@@ -217,10 +257,10 @@
         urls[k] = URL.createObjectURL(toWav(clips[k], SR)); pool[i].src = urls[k]; if (chip) chip.disabled = false;
         if (dl) { dl.href = urls[k]; dl.download = (fileName.replace(/\.[^.]+$/, "") || "clip") + "_" + k + ".wav"; dl.style.display = ""; }
       });
-      showSII(r.sii);
+      specCache = {}; showSII(r.sii);
       dur = input.length / SR;
       $("dlrow").style.display = "flex"; $("tplay").disabled = false;
-      active = 0; switchTo(0);
+      active = 0; switchTo(0); drawSpec();
       status(r.loss ? "done — heard through the loss (unaided degraded; aided restores it)" : r.levels ? "done — real levels (the aid makes it louder)"
                     : (r.nal ? "done — A/B all six" : "done — NAL/DSL need the Python engine"));
       $("run").disabled = false;
@@ -247,6 +287,6 @@
       c.addEventListener("click", function () { switchTo(+c.dataset.i); }); });
     $("tseek").addEventListener("input", function () { var t = ($("tseek").value / 1000) * dur;
       pool.forEach(function (a) { if (a.src) a.currentTime = t; }); $("tfill").style.width = ($("tseek").value / 10) + "%"; });
-    new MutationObserver(drawAg).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    new MutationObserver(function(){drawAg();drawSpec();}).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
   });
 })();
