@@ -171,6 +171,10 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
 .advanced[open]{padding-bottom:8px}
 .advgrp{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);margin:14px 0 6px}
 .advgrp:first-of-type{margin-top:4px}
+.ear2{margin:8px 0 4px}
+.earlbl{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--blue);margin-bottom:3px}
+.minibtn{margin-top:6px;font-family:var(--mono);font-size:10.5px;padding:4px 9px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink-2);cursor:pointer}
+.minibtn:hover{border-color:var(--teal);color:var(--teal)}
 .spec{display:block;width:100%;height:auto;margin-top:12px;background:var(--paper);border:1px solid var(--line);border-radius:8px}
 .blindstart{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink);background:transparent;border:1.5px solid var(--line);border-radius:9px;padding:8px 14px;cursor:pointer;margin-top:14px}
 .blindstart:hover:not(:disabled){border-color:var(--teal);color:var(--teal)} .blindstart:disabled{opacity:.45;cursor:default}
@@ -461,7 +465,9 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
       <div class="sp-head"><span class="sp-num sub">&#9881;</span>
         <div class="sp-title"><h2>Try your own <span class="kind">upload · in-browser · exact</span></h2>
         <p class="sp-blurb">Upload a WAV or MP3, set an audiogram, and hear it re-synthesised &mdash; Original
-        vs Static vs WDRC vs a realistic <b>Rx</b> fit vs OpenMHA-style <b>NAL-NL2</b> / <b>DSL</b>, at 32&nbsp;kHz with the bank running to 12&nbsp;kHz. It runs the <b>real Python
+        vs Static vs WDRC vs a realistic <b>Rx</b> fit vs <b>NAL-NL2</b> / <b>DSL</b> / <b>CAM2</b> (the exact
+        Cambridge/CAMFIT rule, bit-identical to OpenMHA), at 32&nbsp;kHz with the bank running to 12&nbsp;kHz.
+        Tick <b>Two ears</b> to fit each ear on its own audiogram in stereo. It runs the <b>real Python
         module</b> in your browser via Pyodide (numpy/scipy in WebAssembly), so the output is notebook-identical;
         the first run downloads ~30&nbsp;MB and falls back to a JS approximation if that can't load. Nothing is
         uploaded &mdash; it all runs on your machine.</p></div></div>
@@ -486,6 +492,13 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
           <details class="advanced">
             <summary>More options &mdash; program, noise &amp; reverb, bone/OHC, frequency lowering, "hear as the patient"</summary>
             <p class="advgrp">Fitting</p>
+            <label class="chk"><input type="checkbox" id="binaural"> Two ears (binaural)
+              <span class="chknote">&mdash; set a different right-ear audiogram; every fit runs per ear and the output is stereo</span></label>
+            <div class="agwrap ear2" id="agwrap2" hidden>
+              <div><span class="earlbl">right ear</span>
+                <canvas id="agc2" width="290" height="170"></canvas>
+                <button id="copyLR" type="button" class="minibtn">copy left &rarr; right</button></div>
+              <div class="sliders" id="sliders2"></div></div>
             <div class="rowctl"><label for="prog">Program</label>
               <select id="prog"><option value="speech" selected>speech</option>
               <option value="music">music (slow release)</option></select><span>music = wide dynamics</span></div>
@@ -531,7 +544,8 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
               <button class="chip c-rx" data-i="3" aria-pressed="false" disabled>Rx<em>realistic fit</em></button>
               <button class="chip c-nal" data-i="4" aria-pressed="false" disabled>NAL-NL2<em>OpenMHA-style</em></button>
               <button class="chip c-dsl" data-i="5" aria-pressed="false" disabled>DSL<em>OpenMHA-style</em></button>
-              <button class="chip c-per" data-i="6" aria-pressed="false" disabled>Pers<em>bone/OHC-aware</em></button>
+              <button class="chip c-cam" data-i="6" aria-pressed="false" disabled>CAM2<em>exact CAMFIT</em></button>
+              <button class="chip c-per" data-i="7" aria-pressed="false" disabled>Pers<em>bone/OHC-aware</em></button>
             </span>
           </div>
           <div class="transport">
@@ -548,7 +562,7 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
             <a id="dl_original" class="dl">original.wav</a><a id="dl_static" class="dl">static.wav</a>
             <a id="dl_wdrc" class="dl">wdrc.wav</a><a id="dl_rx" class="dl">rx.wav</a>
             <a id="dl_nal" class="dl">nal.wav</a><a id="dl_dsl" class="dl">dsl.wav</a>
-            <a id="dl_per" class="dl">personalized.wav</a></div>
+            <a id="dl_cam" class="dl">cam2.wav</a><a id="dl_per" class="dl">personalized.wav</a></div>
           <button id="blindbtn" class="blindstart" disabled>Blind A/B preference test</button>
           <div class="blind" id="blindpanel" style="display:none">
             <div class="blindhdr">Blind A/B &mdash; two unlabeled fits, pick the one you prefer &middot; trial <b id="btrial">1</b> <span id="btally"></span></div>
@@ -582,8 +596,11 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
   <p><b>Ours vs OpenMHA:</b> the gallery section runs <b>real OpenMHA</b> (its dc_simple compressor).
   <b>CAMFIT</b> is OpenMHA's own authoritative rule (computed by its <span style="font-family:var(--mono)">gainrule_camfit_compr</span>);
   <b>NAL-NL2</b> and <b>DSL</b> use published approximations, since the exact vendor rules aren't public.
-  The "Try your own" tool reproduces NAL-NL2 / DSL in Python (same gaintables, our compressor) &mdash;
-  within ~5&nbsp;dB of OpenMHA's processing on our test clips.</p>
+  The "Try your own" tool reproduces NAL-NL2 / DSL in Python (approximations, our compressor) and adds
+  <b>CAM2</b> &mdash; a faithful port of OpenMHA's own <span style="font-family:var(--mono)">gainrule_camfit_compr</span>
+  that matches the Octave CAMFIT gains to <b>0.00&nbsp;dB</b>, so any uploaded audiogram gets the exact
+  Cambridge rule with no Docker. Tick <b>Two ears</b> to fit each ear on its own audiogram and hear the
+  result in stereo.</p>
   <p class="warn"><b>Research prototype &mdash; not a medical device or a fitting.</b> Processing is offline
   and played to normal-hearing ears, so it shows the aid's output, not what an impaired listener perceives.
   On a steep loss, fully lifting the highs to threshold over-amplifies sibilants; a real fit would use
@@ -797,10 +814,12 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
 (function () {
   "use strict";
   var FREQS = [250, 500, 1000, 2000, 4000, 8000];
-  var ag = [20, 25, 30, 40, 55, 65];
+  var ag = [20, 25, 30, 40, 55, 65];                   // left ear (also the mono audiogram)
+  var agR = ag.slice();                                // right ear (used only in binaural mode)
   var SR = 32000, CAP = 10;                            // process up to 10 s (each fit is a full DSP pass)
   var input = null, fileName = "", urls = {}, clips = {};
-  var KEYS = ["original", "static", "wdrc", "rx", "nal", "dsl", "per"], specCache = {};
+  var KEYS = ["original", "static", "wdrc", "rx", "nal", "dsl", "cam", "per"], specCache = {};
+  var LABELS = ["Original", "Static", "WDRC", "Rx", "NAL-NL2", "DSL", "CAM2", "Personalized"];
   var pyodide = null, pyReady = false, pyBooting = false, pyFailed = false;
   var $ = function (id) { return document.getElementById(id); };
   function status(t) { var e = $("tstatus"); if (e) e.textContent = t; }
@@ -821,7 +840,7 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
   function showMetrics(si, st, er) {                   // SII (audibility) + STOI (intelligibility) + dB-to-target
     var el = $("siirow"); if (!el) return;
     if (!si) { el.style.display = "none"; return; }
-    var L = ["Original", "Static", "WDRC", "Rx", "NAL", "DSL", "Pers"];
+    var L = ["Original", "Static", "WDRC", "Rx", "NAL", "DSL", "CAM2", "Pers"];
     function row(lab, arr, fmt) {
       return '<div><b>' + lab + '</b> ' + L.map(function (n, i) { return n + " " + (arr && arr[i] != null ? fmt(arr[i]) : "–"); }).join("  ·  ") + '</div>';
     }
@@ -859,27 +878,39 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
         if (first) { g.moveTo(xx, y); first = false; } else g.lineTo(xx, y); }
       g.stroke(); g.setLineDash([]);
     }
-    if (clips.original) plot(specCache.original || (specCache.original = ltas(clips.original)), mut, true);
-    var ak = KEYS[active]; if (clips[ak]) plot(specCache[ak] || (specCache[ak] = ltas(clips[ak])), teal, false);
+    if (clips.original) plot(specCache.original || (specCache.original = ltas(chanL(clips.original))), mut, true);
+    var ak = KEYS[active]; if (clips[ak]) plot(specCache[ak] || (specCache[ak] = ltas(chanL(clips[ak]))), teal, false);
   }
-  function toWav(f32, sr) {
-    var n = f32.length, buf = new ArrayBuffer(44 + n * 2), dv = new DataView(buf), i;
+  function chanL(c) { return c && c.l ? c.l : c; }        // mono Float32Array, or the left channel of a stereo clip
+  function toWav(clip, sr) {
+    var stereo = !!(clip && clip.l), l = chanL(clip), r = stereo ? clip.r : null;
+    var ch = stereo ? 2 : 1, n = l.length, bytes = n * ch * 2;
+    var buf = new ArrayBuffer(44 + bytes), dv = new DataView(buf), i;
     function s(o, str) { for (var j = 0; j < str.length; j++) dv.setUint8(o + j, str.charCodeAt(j)); }
-    s(0, "RIFF"); dv.setUint32(4, 36 + n * 2, true); s(8, "WAVE"); s(12, "fmt ");
-    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
-    dv.setUint32(24, sr, true); dv.setUint32(28, sr * 2, true); dv.setUint16(32, 2, true);
-    dv.setUint16(34, 16, true); s(36, "data"); dv.setUint32(40, n * 2, true);
-    for (i = 0; i < n; i++) { var v = Math.max(-1, Math.min(1, f32[i])); dv.setInt16(44 + i * 2, v * 32767, true); }
+    function w16(o, v) { dv.setInt16(o, Math.max(-1, Math.min(1, v)) * 32767, true); }
+    s(0, "RIFF"); dv.setUint32(4, 36 + bytes, true); s(8, "WAVE"); s(12, "fmt ");
+    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, ch, true);
+    dv.setUint32(24, sr, true); dv.setUint32(28, sr * ch * 2, true); dv.setUint16(32, ch * 2, true);
+    dv.setUint16(34, 16, true); s(36, "data"); dv.setUint32(40, bytes, true);
+    for (i = 0; i < n; i++) { var o = 44 + i * ch * 2; w16(o, l[i]); if (stereo) w16(o + 2, r[i]); }
     return new Blob([buf], { type: "audio/wav" });
+  }
+  function normalizeStereo(c, targetDb) {                 // match by JOINT rms so the interaural difference survives
+    var l = c.l, r = c.r, n = l.length, s = 0, i;
+    for (i = 0; i < n; i++) s += l[i] * l[i] + r[i] * r[i];
+    var g = Math.pow(10, targetDb / 20) / (Math.sqrt(s / (2 * n)) + 1e-12);
+    var ol = new Float32Array(n), or = new Float32Array(n);
+    for (i = 0; i < n; i++) { ol[i] = l[i] * g; or[i] = r[i] * g; }
+    return { l: softknee(ol), r: softknee(or) };
   }
 
   // ---- audiogram canvas + sliders ----------------------------------------------------
-  function drawAg() {
-    var c = $("agc"); if (!c) return;
+  function drawAgOn(cid, vals, col) {
+    var c = $(cid); if (!c) return;
     var x = c.getContext("2d"), W = c.width, H = c.height, pl = 34, pr = 8, pt = 10, pb = 20;
     var cs = getComputedStyle(document.documentElement);
-    var line = cs.getPropertyValue("--line") || "#ccc", teal = (cs.getPropertyValue("--teal") || "#227").trim(),
-        ink = cs.getPropertyValue("--muted") || "#678";
+    var line = cs.getPropertyValue("--line") || "#ccc",
+        teal = (cs.getPropertyValue(col || "--teal") || "#227").trim(), ink = cs.getPropertyValue("--muted") || "#678";
     x.clearRect(0, 0, W, H);
     var xx = function (i) { return pl + (W - pl - pr) * i / (FREQS.length - 1); };
     var yy = function (db) { return pt + (H - pt - pb) * (db + 10) / 130; };
@@ -889,25 +920,27 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
     x.textAlign = "center";
     for (var i = 0; i < FREQS.length; i++) x.fillText(FREQS[i] >= 1000 ? FREQS[i] / 1000 + "k" : FREQS[i], xx(i), H - 6);
     x.strokeStyle = teal; x.fillStyle = teal; x.lineWidth = 2; x.beginPath();
-    for (i = 0; i < FREQS.length; i++) { var px = xx(i), py = yy(ag[i]); i ? x.lineTo(px, py) : x.moveTo(px, py); }
+    for (i = 0; i < FREQS.length; i++) { var px = xx(i), py = yy(vals[i]); i ? x.lineTo(px, py) : x.moveTo(px, py); }
     x.stroke();
-    for (i = 0; i < FREQS.length; i++) { x.beginPath(); x.arc(xx(i), yy(ag[i]), 3.5, 0, 6.29); x.fill(); }
+    for (i = 0; i < FREQS.length; i++) { x.beginPath(); x.arc(xx(i), yy(vals[i]), 3.5, 0, 6.29); x.fill(); }
   }
-  function buildSliders() {
-    var host = $("sliders"); if (!host) return; host.innerHTML = "";
+  function drawAg() { drawAgOn("agc", ag, "--teal"); if ($("agc2")) drawAgOn("agc2", agR, "--blue"); }
+  function buildSlidersOn(hostId, vals, col) {
+    var host = $(hostId); if (!host) return; host.innerHTML = "";
     FREQS.forEach(function (f, i) {
       var wrap = document.createElement("label"); wrap.className = "sl";
       wrap.innerHTML = '<span class="slf">' + (f >= 1000 ? f / 1000 + "k" : f) + '</span>' +
-        '<input type="range" min="0" max="120" step="5" value="' + ag[i] + '" orient="vertical">' +
-        '<span class="slv">' + ag[i] + '</span>';
+        '<input type="range" min="0" max="120" step="5" value="' + vals[i] + '" orient="vertical">' +
+        '<span class="slv">' + vals[i] + '</span>';
       var inp = wrap.querySelector("input"), out = wrap.querySelector(".slv");
-      inp.addEventListener("input", function () { ag[i] = +inp.value; out.textContent = inp.value; drawAg(); });
+      inp.addEventListener("input", function () { vals[i] = +inp.value; out.textContent = inp.value; drawAg(); });
       host.appendChild(wrap);
     });
   }
+  function buildSliders() { buildSlidersOn("sliders", ag, "--teal"); buildSlidersOn("sliders2", agR, "--blue"); }
   function preset(name) {
     var P = { normal:[5,5,5,5,10,10], sloping:[20,25,30,40,55,65], flat:[40,42,45,45,48,50], ski:[15,20,30,50,70,80], cookie:[15,35,55,55,35,20], reverse:[60,55,45,30,25,25], notch:[10,15,25,55,30,20] };
-    ag = P[name].slice(); buildSliders(); drawAg();
+    ag = P[name].slice(); buildSliders(); drawAg();          // presets set the LEFT ear (right kept as the user has it)
   }
 
   // ---- Pyodide (real module) ---------------------------------------------------------
@@ -959,6 +992,7 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
     "pm = sp.PersonalizedGainMap(fc, audiogram=ag)",
     "GAINS = {'static': (pm, False), 'wdrc': (pm, True), 'rx': (sp.PrescriptiveGain(fc, ag), True),",
     "         'nal': (fitting.GainTableWDRC(fc, ag, 'nal_nl2'), True), 'dsl': (fitting.GainTableWDRC(fc, ag, 'dsl_mio'), True),",
+    "         'cam': (fitting.GainTableWDRC(fc, ag, 'camfit'), True),",                                  // exact Cambridge/CAMFIT (CAM2)
     "         'per': (sp.PersonalizedWDRC(fc, audiogram=ag, airbone_gap=gap, ohc_health=ohc), True)}",   // bone/OHC-aware
     "rel_eff = 800.0 if prog == 'music' else float(rel)",                          // music program: slow release for wide dynamics
     "OUT = {'original': xin2.astype('float32')}",
@@ -975,10 +1009,10 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
     "if losssim:",                                                               // 'hear it as the patient does'
     "    LS = sp.HearingLossSim(fc, ag)",
     "    for _k in list(OUT): OUT[_k] = sp.run(np.asarray(OUT[_k], dtype=float), sr, gain=LS, **cm)['waveform'].astype('float32')",
-    "yo=OUT['original']; ys=OUT['static']; yw=OUT['wdrc']; yr=OUT['rx']; yn=OUT['nal']; yd=OUT['dsl']; yp=OUT['per']",
-    "si=[SII[k] for k in ['original','static','wdrc','rx','nal','dsl','per']]",
-    "st=[STOI[k] for k in ['original','static','wdrc','rx','nal','dsl','per']]",
-    "er=[ERR[k] for k in ['original','static','wdrc','rx','nal','dsl','per']]"
+    "yo=OUT['original']; ys=OUT['static']; yw=OUT['wdrc']; yr=OUT['rx']; yn=OUT['nal']; yd=OUT['dsl']; yc=OUT['cam']; yp=OUT['per']",
+    "si=[SII[k] for k in ['original','static','wdrc','rx','nal','dsl','cam','per']]",
+    "st=[STOI[k] for k in ['original','static','wdrc','rx','nal','dsl','cam','per']]",
+    "er=[ERR[k] for k in ['original','static','wdrc','rx','nal','dsl','cam','per']]"
   ].join("\n");
 
   function opts() {
@@ -988,14 +1022,15 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
              levels: !!($("levels") && $("levels").value === "real"),
              noise: $("noise") ? +$("noise").value : -1, nr: !!($("nr") && $("nr").checked),
              prog: $("prog") ? $("prog").value : "speech",
-             ntype: $("ntype") ? $("ntype").value : "ssn", rev: $("rev") ? +$("rev").value : 0 };
+             ntype: $("ntype") ? $("ntype").value : "ssn", rev: $("rev") ? +$("rev").value : 0,
+             binaural: !!($("binaural") && $("binaural").checked) };
   }
-  function runEngine() {
-    var o = opts();
+  function runEngine(agVals) {                            // agVals: audiogram to fit (one ear); defaults to left
+    var o = opts(); agVals = agVals || ag;
     if (pyReady) {
       pyodide.globals.set("xin", input);
       pyodide.globals.set("agf", pyodide.toPy(FREQS));
-      pyodide.globals.set("agv", pyodide.toPy(ag));
+      pyodide.globals.set("agv", pyodide.toPy(agVals));
       pyodide.globals.set("sr", SR); pyodide.globals.set("rel", o.rel);
       pyodide.globals.set("spl", o.spl); pyodide.globals.set("flow", o.flow); pyodide.globals.set("losssim", o.loss);
       pyodide.globals.set("gap", o.gap); pyodide.globals.set("ohc", o.ohc);
@@ -1004,11 +1039,11 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
       pyodide.globals.set("ntype", o.ntype); pyodide.globals.set("rev", o.rev);
       pyodide.runPython(PYCODE);
       var G = function (n) { return Float32Array.from(pyodide.globals.get(n).toJs()); };
-      return Promise.resolve({ original: G("yo"), static: G("ys"), wdrc: G("yw"), rx: G("yr"), nal: G("yn"), dsl: G("yd"), per: G("yp"),
+      return Promise.resolve({ original: G("yo"), static: G("ys"), wdrc: G("yw"), rx: G("yr"), nal: G("yn"), dsl: G("yd"), cam: G("yc"), per: G("yp"),
         sii: pyodide.globals.get("si").toJs(), stoi: pyodide.globals.get("st").toJs(), err: pyodide.globals.get("er").toJs(),
         loss: o.loss, levels: o.levels });
     }
-    var jo = { agFreqs: FREQS, agVals: ag, presentSPL: o.spl, nBands: 32 };   // JS fallback (no NAL/DSL/Personalized/loss-sim)
+    var jo = { agFreqs: FREQS, agVals: agVals, presentSPL: o.spl, nBands: 32 };   // JS fallback (no NAL/DSL/CAM2/Pers/loss-sim)
     return Promise.resolve({
       static: DSP.process(input, SR, Object.assign({ mode: "static" }, jo)),
       wdrc: DSP.process(input, SR, Object.assign({ mode: "wdrc", attackMs: 5, releaseMs: o.rel }, jo)),
@@ -1050,46 +1085,75 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
     if (i === active || !pool[i]) return; var f = pool[active], t = pool[i];
     if (f) { f.pause(); t.currentTime = f.currentTime; } active = i;
     document.querySelectorAll("#tchips .chip").forEach(function (c) { c.setAttribute("aria-pressed", c.dataset.i == i); });
-    $("tcur").textContent = ["Original","Static","WDRC","Rx","NAL-NL2","DSL","Personalized"][i]; if (on) t.play();
+    $("tcur").textContent = LABELS[i]; if (on) t.play();
     drawSpec();
   }
+
+  function applyClips() {                                 // wire the (mono or stereo) clips{} to chips / player / downloads
+    KEYS.forEach(function (k, i) {
+      var chip = document.querySelector('#tchips .chip[data-i="' + i + '"]'), dl = $("dl_" + k);
+      if (!clips[k]) { if (chip) chip.disabled = true; if (dl) dl.style.display = "none"; return; }
+      if (urls[k]) URL.revokeObjectURL(urls[k]);
+      urls[k] = URL.createObjectURL(toWav(clips[k], SR)); pool[i].src = urls[k]; if (chip) chip.disabled = false;
+      if (dl) { dl.href = urls[k]; dl.download = (fileName.replace(/\.[^.]+$/, "") || "clip") + "_" + k + ".wav"; dl.style.display = ""; }
+    });
+  }
+  function finishUp(si, st, er, msg) {
+    specCache = {}; showMetrics(si, st, er);
+    dur = input.length / SR;
+    $("dlrow").style.display = "flex"; $("tplay").disabled = false;
+    if ($("blindbtn")) $("blindbtn").disabled = false;
+    active = 0; switchTo(0); drawSpec(); status(msg); $("run").disabled = false;
+  }
+  function peakOf(arrs) { var pk = 0, j, i; for (j = 0; j < arrs.length; j++) { var a = arrs[j]; for (i = 0; i < a.length; i++) { var v = Math.abs(a[i]); if (v > pk) pk = v; } } return pk; }
+  function scaleTo(a, g) { var o = new Float32Array(a.length), i; for (i = 0; i < a.length; i++) o[i] = a[i] * g; return softknee(o); }
 
   function process() {
     if (!input) { status("pick a file first"); return; }
     $("run").disabled = true; status("processing…");
+    var o = opts(), bin;
     bootPyodide().then(function () {
-      return runEngine();
-    }).then(function (r) {
-      var keys = ["original", "static", "wdrc", "rx", "nal", "dsl", "per"];
-      if (r.loss || r.levels) {              // loss-sim OR 'real levels': one common scale keeps the natural differences
-        var pk = 0; keys.forEach(function (k) { if (r[k]) for (var i = 0; i < r[k].length; i++) { var a = Math.abs(r[k][i]); if (a > pk) pk = a; } });
-        var g = 0.92 / (pk + 1e-9);
-        keys.forEach(function (k) { if (!r[k]) { clips[k] = null; return; } var o = new Float32Array(r[k].length); for (var i = 0; i < r[k].length; i++) o[i] = r[k][i] * g; clips[k] = softknee(o); });
-      } else {                               // loudness-matched A/B
-        clips.original = normalize(r.original || input.slice(), -24);
-        ["static", "wdrc", "rx", "nal", "dsl", "per"].forEach(function (k) { clips[k] = r[k] ? normalize(r[k], -20) : null; });
+      bin = o.binaural && pyReady;                         // binaural needs the Python engine (per-ear fits)
+      if (bin) return runEngine(ag).then(function (L) { return runEngine(agR).then(function (R) { return { L: L, R: R }; }); });
+      return runEngine(ag).then(function (L) { return { L: L }; });
+    }).then(function (res) {
+      var L = res.L, R = res.R, common = L.loss || L.levels;
+      if (bin) {                                           // ---- binaural: combine per-ear results into stereo ----
+        var raw = {};
+        KEYS.forEach(function (k) { raw[k] = (L[k] && R[k]) ? { l: L[k], r: R[k] } : null; });
+        if (common) {
+          var chans = []; KEYS.forEach(function (k) { if (raw[k]) { chans.push(raw[k].l); chans.push(raw[k].r); } });
+          var g = 0.92 / (peakOf(chans) + 1e-9);
+          KEYS.forEach(function (k) { clips[k] = raw[k] ? { l: scaleTo(raw[k].l, g), r: scaleTo(raw[k].r, g) } : null; });
+        } else {
+          KEYS.forEach(function (k) { clips[k] = raw[k] ? normalizeStereo(raw[k], k === "original" ? -24 : -20) : null; });
+        }
+        var mn = function (a, b) { return a && b ? a.map(function (v, i) { return Math.min(v, b[i]); }) : null; };
+        var mx = function (a, b) { return a && b ? a.map(function (v, i) { return Math.max(v, b[i]); }) : null; };
+        applyClips();
+        finishUp(mn(L.sii, R.sii), mn(L.stoi, R.stoi), mx(L.err, R.err),   // poorer ear (worse SII/STOI, larger dB error)
+                 "done — binaural, each ear fit on its own audiogram (headphones); SII is the poorer ear");
+        return;
       }
-      keys.forEach(function (k, i) {
-        var chip = document.querySelector('#tchips .chip[data-i="' + i + '"]'), dl = $("dl_" + k);
-        if (!clips[k]) { if (chip) chip.disabled = true; if (dl) dl.style.display = "none"; return; }
-        if (urls[k]) URL.revokeObjectURL(urls[k]);
-        urls[k] = URL.createObjectURL(toWav(clips[k], SR)); pool[i].src = urls[k]; if (chip) chip.disabled = false;
-        if (dl) { dl.href = urls[k]; dl.download = (fileName.replace(/\.[^.]+$/, "") || "clip") + "_" + k + ".wav"; dl.style.display = ""; }
-      });
-      specCache = {}; showMetrics(r.sii, r.stoi, r.err);
-      dur = input.length / SR;
-      $("dlrow").style.display = "flex"; $("tplay").disabled = false;
-      if ($("blindbtn")) $("blindbtn").disabled = false;
-      active = 0; switchTo(0); drawSpec();
-      status(r.loss ? "done — heard through the loss (unaided degraded; aided restores it)" : r.levels ? "done — real levels (the aid makes it louder)"
-                    : (r.nal ? "done — A/B all six" : "done — NAL/DSL need the Python engine"));
-      $("run").disabled = false;
+      var r = L;                                           // ---- mono ----
+      if (common) {
+        var arrs = []; KEYS.forEach(function (k) { if (r[k]) arrs.push(r[k]); });
+        var g = 0.92 / (peakOf(arrs) + 1e-9);
+        KEYS.forEach(function (k) { clips[k] = r[k] ? scaleTo(r[k], g) : null; });
+      } else {
+        clips.original = normalize(r.original || input.slice(), -24);
+        KEYS.slice(1).forEach(function (k) { clips[k] = r[k] ? normalize(r[k], -20) : null; });
+      }
+      applyClips();
+      finishUp(r.sii, r.stoi, r.err,
+               r.loss ? "done — heard through the loss (unaided degraded; aided restores it)" : r.levels ? "done — real levels (the aid makes it louder)"
+                      : (r.nal ? "done — A/B all seven" : "done — NAL/DSL/CAM2 need the Python engine"));
     }).catch(function (e) { status("processing failed: " + e.message); console.error(e); $("run").disabled = false; });
   }
 
   // ---- blind A/B preference test -----------------------------------------------------
   var blind = { A: null, B: null, trials: [], ba: null, bb: null, n: 0 };
-  var LAB = { original: "Original", static: "Static", wdrc: "WDRC", rx: "Rx", nal: "NAL-NL2", dsl: "DSL", per: "Personalized" };
+  var LAB = {}; KEYS.forEach(function (k, i) { LAB[k] = LABELS[i]; });
   function blindNext() {
     var ks = KEYS.filter(function (k) { return clips[k]; }); if (ks.length < 2) return;
     var i = Math.floor(Math.random() * ks.length), j; do { j = Math.floor(Math.random() * ks.length); } while (j === i);
@@ -1127,8 +1191,13 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
     if ($("ohc")) $("ohc").addEventListener("input", function () { $("ohcv").textContent = $("ohc").value + "%"; });
     document.querySelectorAll("[data-preset]").forEach(function (b) {
       b.addEventListener("click", function () { preset(b.dataset.preset); }); });
+    if ($("binaural")) $("binaural").addEventListener("change", function () {
+      var on = $("binaural").checked; var w = $("agwrap2"); if (w) w.hidden = !on;
+      if (on) { buildSliders(); drawAg(); } });
+    if ($("copyLR")) $("copyLR").addEventListener("click", function () {
+      agR = ag.slice(); buildSliders(); drawAg(); });
     $("run").addEventListener("click", process);
-    for (var i = 0; i < 7; i++) { pool[i] = new Audio(); pool[i].preload = "auto"; }
+    for (var i = 0; i < KEYS.length; i++) { pool[i] = new Audio(); pool[i].preload = "auto"; }
     blind.ba = new Audio(); blind.bb = new Audio();
     try { var _sv = JSON.parse(localStorage.getItem("blind_ab") || "[]"); if (_sv.length) blind.trials = _sv; } catch (e) {}
     if ($("blindbtn")) $("blindbtn").addEventListener("click", function () {

@@ -241,6 +241,10 @@ TOOL_CSS = """
 .advanced[open]{padding-bottom:8px}
 .advgrp{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);margin:14px 0 6px}
 .advgrp:first-of-type{margin-top:4px}
+.ear2{margin:8px 0 4px}
+.earlbl{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--blue);margin-bottom:3px}
+.minibtn{margin-top:6px;font-family:var(--mono);font-size:10.5px;padding:4px 9px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink-2);cursor:pointer}
+.minibtn:hover{border-color:var(--teal);color:var(--teal)}
 .spec{display:block;width:100%;height:auto;margin-top:12px;background:var(--paper);border:1px solid var(--line);border-radius:8px}
 .blindstart{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink);background:transparent;border:1.5px solid var(--line);border-radius:9px;padding:8px 14px;cursor:pointer;margin-top:14px}
 .blindstart:hover:not(:disabled){border-color:var(--teal);color:var(--teal)} .blindstart:disabled{opacity:.45;cursor:default}
@@ -261,7 +265,9 @@ TOOL_HTML = f"""
       <div class="sp-head"><span class="sp-num sub">&#9881;</span>
         <div class="sp-title"><h2>Try your own <span class="kind">upload · in-browser · exact</span></h2>
         <p class="sp-blurb">Upload a WAV or MP3, set an audiogram, and hear it re-synthesised &mdash; Original
-        vs Static vs WDRC vs a realistic <b>Rx</b> fit vs OpenMHA-style <b>NAL-NL2</b> / <b>DSL</b>, at 32&nbsp;kHz with the bank running to 12&nbsp;kHz. It runs the <b>real Python
+        vs Static vs WDRC vs a realistic <b>Rx</b> fit vs <b>NAL-NL2</b> / <b>DSL</b> / <b>CAM2</b> (the exact
+        Cambridge/CAMFIT rule, bit-identical to OpenMHA), at 32&nbsp;kHz with the bank running to 12&nbsp;kHz.
+        Tick <b>Two ears</b> to fit each ear on its own audiogram in stereo. It runs the <b>real Python
         module</b> in your browser via Pyodide (numpy/scipy in WebAssembly), so the output is notebook-identical;
         the first run downloads ~30&nbsp;MB and falls back to a JS approximation if that can't load. Nothing is
         uploaded &mdash; it all runs on your machine.</p></div></div>
@@ -286,6 +292,13 @@ TOOL_HTML = f"""
           <details class="advanced">
             <summary>More options &mdash; program, noise &amp; reverb, bone/OHC, frequency lowering, "hear as the patient"</summary>
             <p class="advgrp">Fitting</p>
+            <label class="chk"><input type="checkbox" id="binaural"> Two ears (binaural)
+              <span class="chknote">&mdash; set a different right-ear audiogram; every fit runs per ear and the output is stereo</span></label>
+            <div class="agwrap ear2" id="agwrap2" hidden>
+              <div><span class="earlbl">right ear</span>
+                <canvas id="agc2" width="290" height="170"></canvas>
+                <button id="copyLR" type="button" class="minibtn">copy left &rarr; right</button></div>
+              <div class="sliders" id="sliders2"></div></div>
             <div class="rowctl"><label for="prog">Program</label>
               <select id="prog"><option value="speech" selected>speech</option>
               <option value="music">music (slow release)</option></select><span>music = wide dynamics</span></div>
@@ -331,7 +344,8 @@ TOOL_HTML = f"""
               <button class="chip c-rx" data-i="3" aria-pressed="false" disabled>Rx<em>realistic fit</em></button>
               <button class="chip c-nal" data-i="4" aria-pressed="false" disabled>NAL-NL2<em>OpenMHA-style</em></button>
               <button class="chip c-dsl" data-i="5" aria-pressed="false" disabled>DSL<em>OpenMHA-style</em></button>
-              <button class="chip c-per" data-i="6" aria-pressed="false" disabled>Pers<em>bone/OHC-aware</em></button>
+              <button class="chip c-cam" data-i="6" aria-pressed="false" disabled>CAM2<em>exact CAMFIT</em></button>
+              <button class="chip c-per" data-i="7" aria-pressed="false" disabled>Pers<em>bone/OHC-aware</em></button>
             </span>
           </div>
           <div class="transport">
@@ -348,7 +362,7 @@ TOOL_HTML = f"""
             <a id="dl_original" class="dl">original.wav</a><a id="dl_static" class="dl">static.wav</a>
             <a id="dl_wdrc" class="dl">wdrc.wav</a><a id="dl_rx" class="dl">rx.wav</a>
             <a id="dl_nal" class="dl">nal.wav</a><a id="dl_dsl" class="dl">dsl.wav</a>
-            <a id="dl_per" class="dl">personalized.wav</a></div>
+            <a id="dl_cam" class="dl">cam2.wav</a><a id="dl_per" class="dl">personalized.wav</a></div>
           <button id="blindbtn" class="blindstart" disabled>Blind A/B preference test</button>
           <div class="blind" id="blindpanel" style="display:none">
             <div class="blindhdr">Blind A/B &mdash; two unlabeled fits, pick the one you prefer &middot; trial <b id="btrial">1</b> <span id="btally"></span></div>
@@ -561,8 +575,11 @@ footer .warn{{border-left:2px solid var(--amber);padding-left:12px;margin-top:14
   <p><b>Ours vs OpenMHA:</b> the gallery section runs <b>real OpenMHA</b> (its dc_simple compressor).
   <b>CAMFIT</b> is OpenMHA's own authoritative rule (computed by its <span style="font-family:var(--mono)">gainrule_camfit_compr</span>);
   <b>NAL-NL2</b> and <b>DSL</b> use published approximations, since the exact vendor rules aren't public.
-  The "Try your own" tool reproduces NAL-NL2 / DSL in Python (same gaintables, our compressor) &mdash;
-  within ~5&nbsp;dB of OpenMHA's processing on our test clips.</p>
+  The "Try your own" tool reproduces NAL-NL2 / DSL in Python (approximations, our compressor) and adds
+  <b>CAM2</b> &mdash; a faithful port of OpenMHA's own <span style="font-family:var(--mono)">gainrule_camfit_compr</span>
+  that matches the Octave CAMFIT gains to <b>0.00&nbsp;dB</b>, so any uploaded audiogram gets the exact
+  Cambridge rule with no Docker. Tick <b>Two ears</b> to fit each ear on its own audiogram and hear the
+  result in stereo.</p>
   <p class="warn"><b>Research prototype &mdash; not a medical device or a fitting.</b> Processing is offline
   and played to normal-hearing ears, so it shows the aid's output, not what an impaired listener perceives.
   On a steep loss, fully lifting the highs to threshold over-amplifies sibilants; a real fit would use
