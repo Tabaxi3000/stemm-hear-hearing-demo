@@ -92,14 +92,22 @@ def subject_section(s):
         chips.append(f'<button class="chip c-{c["cls"]}" data-i="{i}" aria-pressed="{pressed}">'
                      f'{html.escape(c["label"])}<em>{html.escape(c["sub"])}</em></button>')
     hint = "&mdash; headphones: the two ears differ"
-    figcap = s.get("figcap", "Both ears &mdash; audiogram &amp; prescribed gain")
+    if s.get("io"):                                       # audiogram + input/output, like the shapes
+        charts = (f'<div class="charts">'
+                  f'<figure class="paper"><img alt="Audiogram, {html.escape(s["name"])}" '
+                  f'src="data:image/png;base64,{s["png"]}"><figcaption>Audiogram (both ears)</figcaption></figure>'
+                  f'<figure class="paper"><img alt="Input/output, {html.escape(s["name"])}" '
+                  f'src="data:image/png;base64,{s["io"]}"><figcaption>Input&nbsp;&rarr;&nbsp;output (compression)</figcaption></figure>'
+                  f'</div>')
+    else:                                                 # single wide figure (e.g. the ILD bar chart)
+        charts = (f'<figure class="paper wide"><img alt="{html.escape(s["name"])}" '
+                  f'src="data:image/png;base64,{s["png"]}"><figcaption>{s.get("figcap","")}</figcaption></figure>')
     return f"""
     <section class="specimen subject" id="st-{s['id']}" data-player>
       <div class="sp-head"><span class="sp-num sub">&#9670;</span>
         <div class="sp-title"><h2>{html.escape(s['name'])} <span class="kind">{html.escape(s['kind'])}</span>{badge}</h2>
         <p class="sp-blurb">{html.escape(blurb)} {ild_txt}</p></div></div>
-      <figure class="paper wide"><img alt="{html.escape(s['name'])}"
-        src="data:image/png;base64,{s['png']}"><figcaption>{figcap}</figcaption></figure>
+      {charts}
       <div class="console"><div class="chips">{chips[0]}<span class="sep"></span>
         <span class="ramp">{''.join(chips[1:])}</span></div>
         {transport('Original').format(hint=hint)}</div>

@@ -53,26 +53,32 @@ T20 = 10 ** (-20/20)
 
 # ---- two-ear audiogram + per-ear insertion-gain figures ------------------------------
 RED, BLUE = "#C0392B", "#2C6FB0"
-def subject_png(sub, path):
-    fig, ax = plt.subplots(1, 2, figsize=(7.4, 3.0), dpi=150)
+def subject_ag_png(sub, path):                                  # two-ear audiogram (matches the shapes)
+    fig, ax = plt.subplots(figsize=(3.7, 3.0), dpi=150)
     fr = sorted(sub["aR"]); xs = range(len(fr))
-    ax[0].plot(xs, [sub["aR"][f] for f in fr], "-o", color=RED, ms=5, lw=1.8, label="Right")
-    ax[0].plot(xs, [sub["aL"][f] for f in fr], "-x", color=BLUE, ms=7, mew=2, lw=1.8, label="Left")
-    ax[0].set_xticks(list(xs)); ax[0].set_xticklabels([f"{f//1000}k" if f>=1000 else str(f) for f in fr], fontsize=8)
-    ax[0].set_ylim(120,-10); ax[0].set_yticks(range(0,121,20)); ax[0].axhspan(-10,20,color="#EAF3F3",zorder=0)
-    ax[0].set_ylabel("dB HL", fontsize=8.5); ax[0].set_title("Audiogram (both ears)", fontsize=9.5)
-    ax[0].tick_params(labelsize=8); ax[0].grid(alpha=.25); ax[0].legend(fontsize=8, loc="lower left")
-    for s in ("top","right"): ax[0].spines[s].set_visible(False)
-    fcb = FC
-    for ag, col, lab, mk in [(sub["aR"],RED,"Right","-"),(sub["aL"],BLUE,"Left","--")]:
-        pm = sp.PersonalizedGainMap(fcb, audiogram=ag)
-        gain = pm.slope*50.0 + pm.offset - 50.0                # insertion gain at 50 dB SPL input
-        ax[1].semilogx(fcb, gain, mk, color=col, lw=2, label=lab)
-    ax[1].set_xlabel("Hz", fontsize=8.5); ax[1].set_ylabel("insertion gain (dB)", fontsize=8.5)
-    ax[1].set_title("Prescribed gain per ear", fontsize=9.5)
-    ax[1].tick_params(labelsize=8); ax[1].grid(alpha=.25, which="both"); ax[1].legend(fontsize=8)
-    for s in ("top","right"): ax[1].spines[s].set_visible(False)
-    fig.tight_layout(pad=0.5); fig.savefig(path, transparent=True); plt.close(fig)
+    ax.plot(xs, [sub["aR"][f] for f in fr], "-o", color=RED, ms=5, lw=1.8, label="Right")
+    ax.plot(xs, [sub["aL"][f] for f in fr], "-x", color=BLUE, ms=7, mew=2, lw=1.8, label="Left")
+    ax.set_xticks(list(xs)); ax.set_xticklabels([f"{f//1000}k" if f>=1000 else str(f) for f in fr], fontsize=8)
+    ax.set_ylim(120,-10); ax.set_yticks(range(0,121,20)); ax.axhspan(-10,20,color="#EAF3F3",zorder=0)
+    ax.set_ylabel("dB HL", fontsize=8.5); ax.set_xlabel("Frequency (Hz)", fontsize=8.5)
+    ax.tick_params(labelsize=8); ax.grid(alpha=.25); ax.legend(fontsize=8, loc="lower left")
+    for s in ("top","right"): ax.spines[s].set_visible(False)
+    fig.tight_layout(pad=0.4); fig.savefig(path, transparent=True); plt.close(fig)
+
+def subject_io_png(sub, path):                                  # input/output curve => shows COMPRESSION
+    fig, ax = plt.subplots(figsize=(3.7, 3.0), dpi=150)
+    xin = np.linspace(0, 100, 200)
+    ax.plot(xin, xin, "--", color="#9AA7A6", lw=1.2, label="unaided (y = x)")
+    b = int(np.argmin(np.abs(FC - 2000.0)))                     # a representative band
+    for ag, col, lab in [(sub["aR"], RED, "Right"), (sub["aL"], BLUE, "Left")]:
+        pm = sp.PersonalizedGainMap(FC, audiogram=ag)           # slope < 1 => compression
+        ax.plot(xin, pm.slope[b]*xin + pm.offset[b], "-", color=col, lw=2, label=f"{lab} @2 kHz")
+    ax.set_xlim(0, 100); ax.set_ylim(0, 125)
+    ax.set_xlabel("input level (dB SPL)", fontsize=8.5); ax.set_ylabel("output (dB SPL)", fontsize=8.5)
+    ax.set_title("Input → output (compression)", fontsize=9.5)
+    ax.tick_params(labelsize=8); ax.grid(alpha=.25); ax.legend(fontsize=7.5, loc="lower right")
+    for s in ("top","right"): ax.spines[s].set_visible(False)
+    fig.tight_layout(pad=0.4); fig.savefig(path, transparent=True); plt.close(fig)
 
 # ---- stereo AAC encode ---------------------------------------------------------------
 def to_aac_b64(st):                                   # st: (N,2) float
@@ -99,11 +105,12 @@ for sub in SUBJECTS:
              ("left","Left-ear fit","left audiogram","left",left_iso),
              ("right","Right-ear fit","right audiogram","right",right_iso),
              ("binaural","Binaural","each ear its own fit","bin",binaural)]
-    pth = os.path.join(SC, f"subj_{sub['id']}.png"); subject_png(sub, pth)
+    agp = os.path.join(SC, f"subj_{sub['id']}_ag.png"); subject_ag_png(sub, agp)
+    iop = os.path.join(SC, f"subj_{sub['id']}_io.png"); subject_io_png(sub, iop)
     out["subjects"].append(dict(
         id=sub["id"], name=sub["name"], kind=sub["kind"], blurb=sub["blurb"],
-        placeholder=(sub["src"]=="music"), ild_db=round(float(ild),1), png=png_b64(pth),
-        figcap="Both ears &mdash; audiogram &amp; prescribed gain",
+        placeholder=(sub["src"]=="music"), ild_db=round(float(ild),1),
+        png=png_b64(agp), io=png_b64(iop),
         conditions=[dict(id=c, label=l, sub=s, cls=cl, aac=to_aac_b64(a)) for c,l,s,cl,a in conds]))
     print(f"{sub['name']:12s} rendered | aided R-L level diff {ild:+.1f} dB")
 
