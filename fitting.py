@@ -93,29 +93,86 @@ def dsl_mio(audiogram, freqs, levels=(50., 65., 80.)):
     return np.maximum(g, 0.0)
 
 
-def camfit(audiogram, freqs, levels=(50., 65., 80.)):
-    """AUTHORITATIVE CAMFIT (Moore) compression gains -- the one non-proprietary rule we
-    can run for real: precomputed by OpenMHA's own `gainrule_camfit_compr.m` (via
-    `camfit_octave.m` in the OpenMHA container) and cached in `camfit_cache.json`.
+# ----------------------------------------------------------------------------------------
+# CAM2 / CAMFIT (compressive Cambridge rule, Moore et al. 1999, Brit. J. Audiol. 33:157-170)
+# Faithful Python port of OpenMHA's `gainrule_camfit_compr.m` (+ camfit_linear, isothr,
+# freq_interp_sh, LTASS_speech_level_in_frequency_bands). Reproduces OpenMHA's own CAMFIT gains
+# to <0.1 dB (validated in openmha/validate_camfit_py.py) but for ANY audiogram, with no Octave/
+# Docker -- so the live tool and the subject fits can use the real Cambridge rule.
+# Ported from openMHA (AGPLv3, (c) HoerTech gGmbH); attribution retained.
+_ISO_F = np.array([0, 20, 25, 31.5, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500,
+                   630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000,
+                   10000, 12500, 14000, 16000, 18000, 20000.])
+_ISO_THR = np.array([80, 78.5, 68.7, 59.5, 51.1, 44, 37.5, 31.5, 26.5, 22.1, 17.9, 14.4, 11.4,
+                     8.6, 6.2, 4.4, 3.0, 2.2, 2.4, 3.5, 1.7, -1.3, -4.2, -6.0, -5.4, -1.5, 6.0,
+                     12.6, 13.9, 12.3, 18.4, 40.2, 73.2, 70.0])
+_LTASS_FREQ = np.array([63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250,
+                        1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000, 12500, 16000.])
+_LTASS_LEV = np.array([38.6, 43.5, 54.4, 57.7, 56.8, 60.2, 60.3, 59.0, 62.1, 62.1, 60.5, 56.8,
+                       53.7, 53.0, 52.0, 48.7, 48.1, 46.8, 45.6, 44.5, 44.3, 43.7, 43.4, 41.3, 40.7])
+_CAM_INT_F = np.array([125, 250, 500, 750, 1000, 1500, 2000, 3000, 4000, 5000, 5005.])
+_CAM_INT = np.array([-11, -10, -8, -6, 0, -1, 1, -1, 0, 1, 1.])
 
-    Unlike nal_nl2/dsl_mio (Python approximations), these are exactly what OpenMHA computes.
-    Only the cached (audiogram, freqs, levels) are available -- regenerate the cache with
-    `run_camfit.sh` for a different audiogram or band set.
-    """
-    import json
-    import os
-    path = os.path.join(os.path.dirname(__file__), "camfit_cache.json")
-    if not os.path.exists(path):
-        raise RuntimeError("CAMFIT cache missing -- run openmha/run_camfit.sh to build it")
-    c = json.load(open(path))
-    if [float(f) for f in freqs] != [float(f) for f in c["freqs"]]:
-        raise ValueError(f"CAMFIT cache is for freqs {c['freqs']}, got {list(freqs)} "
-                         "-- rerun run_camfit.sh")
-    if {str(k): v for k, v in dict(audiogram).items()} != c["audiogram"]:
-        raise ValueError("CAMFIT cache is for a different audiogram -- rerun run_camfit.sh")
-    g = np.array(c["gains"])
-    idx = [c["levels"].index(int(L)) for L in levels]     # must be cached levels
-    return g[idx, :]
+
+def _freq_interp_sh(f_in, y_in, f):
+    """Linear interpolation on log-frequency with sample-and-hold on the edges (openMHA
+    freq_interp_sh) -- np.interp clamps outside the range, matching the held endpoints."""
+    f_in = np.maximum(np.asarray(f_in, float), np.finfo(float).eps)
+    return np.interp(np.log(np.asarray(f, float)), np.log(f_in), np.asarray(y_in, float))
+
+
+def _isothr(f):
+    """ISO 226/389 HL->SPL threshold conversion at frequencies f (openMHA isothr)."""
+    return np.interp(np.maximum(np.asarray(f, float), 50.0), _ISO_F, _ISO_THR)
+
+
+def _ltass_band_levels(edge_freqs, target):
+    """Physical band levels of an LTASS-shaped signal of broadband `target` dB SPL, summed by
+    intensity across the fitmodel bands defined by `edge_freqs` (openMHA LTASS_..._bands)."""
+    lf = _LTASS_FREQ
+    ledge = np.concatenate([[0.0], np.sqrt(lf[:-1] * lf[1:]), [16000 * 2 ** (1 / 6)]])
+    lint = 10 ** (_LTASS_LEV / 10)
+    edge = np.asarray(edge_freqs, float)
+    out = np.zeros(len(edge) - 1)
+    for b in range(len(out)):
+        lo, hi = edge[b], edge[b + 1]
+        inter_lo = np.maximum(lo, ledge[:-1]); inter_hi = np.minimum(hi, ledge[1:])
+        portion = np.maximum(inter_hi - inter_lo, 0.0) / (ledge[1:] - ledge[:-1])
+        out[b] = 10 * np.log10(np.sum(lint * portion)) + (target - 70)
+    return out
+
+
+def _camfit_linear_ig(htl, fc):
+    """Linear Cambridge insertion gains: 0.48*HL + intercept, non-negative (Moore 1998, part I)."""
+    intercepts = _freq_interp_sh(_CAM_INT_F, _CAM_INT, fc)
+    ig = np.maximum(htl * 0.48 + intercepts, 0.0)
+    return ig * (1.0 if np.any(htl) else 0.0)
+
+
+def camfit(audiogram, freqs, levels=(50., 65., 80.), max_output_level=100.0):
+    """AUTHORITATIVE CAMFIT / CAM2 compression gains (Moore et al. 1999) -- the one
+    non-proprietary clinical rule, ported from OpenMHA's own `gainrule_camfit_compr.m`.
+
+    Reproduces OpenMHA's Octave CAMFIT to <0.1 dB but for arbitrary audiograms, so the tool
+    and the binaural subject fits can use the real Cambridge rule without Docker. Returns
+    gains[len(levels), len(freqs)] in dB (non-negative, limited to `max_output_level` output)."""
+    fc = np.asarray(freqs, float)
+    edge = np.concatenate([[0.1], np.sqrt(fc[:-1] * fc[1:]), [1e7]])
+    speech65 = _ltass_band_levels(edge, 65.0)
+    minima_distance = 38.0
+    Lmin = speech65 - minima_distance
+    Conv = _isothr(fc)
+    af = np.array(sorted(audiogram), float); ah = np.array([audiogram[k] for k in sorted(audiogram)], float)
+    htl = _freq_interp_sh(af, ah, fc)
+    Gmin = htl + Conv - Lmin
+    Gmid = _camfit_linear_ig(htl, fc)                                   # Lmid = speech65
+    cr = np.maximum(minima_distance / np.maximum(speech65 + Gmid - Lmin - Gmin, 13.0), 1.0)
+    lev = np.asarray(levels, float)[:, None]
+    g = ((lev - Lmin[None, :]) / cr[None, :] + (Lmin + Gmin)[None, :]) - lev   # gains() helper
+    g = (g + np.abs(g)) / 2                                              # no negative gain
+    out_levels = g + lev
+    g = g - (out_levels - np.minimum(out_levels, max_output_level))      # cap band output level
+    return g * (1.0 if np.any(htl) else 0.0)
 
 
 def ours(audiogram, freqs, levels=(50., 65., 80.)):

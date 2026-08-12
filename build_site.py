@@ -16,6 +16,7 @@ shutil.copy(os.path.join(HERE, "..", "openmha", "fitting.py"), os.path.join(HERE
 A = json.load(open(os.path.join(HERE, "assets.json")))
 S = json.load(open(os.path.join(HERE, "subjects.json")))
 O = json.load(open(os.path.join(HERE, "openmha_section.json")))
+SO = json.load(open(os.path.join(HERE, "subjects_openmha.json")))
 
 BLURB = {
     "sloping":  "Gentle high-frequency slope; near-normal lows.",
@@ -150,12 +151,42 @@ def openmha_section(a):                                  # ours (Rx) vs OpenMHA 
     </section>"""
 
 
+def subj_omha_section(a):                               # binaural subject: ours vs OpenMHA, per ear
+    audios, chips = [], []
+    for i, c in enumerate(a["conditions"]):
+        audios.append(f'<audio data-i="{i}" preload="none" src="{c["file"]}"></audio>')
+        pressed = "true" if i == 0 else "false"
+        chips.append(f'<button class="chip c-{c["cls"]}" data-i="{i}" aria-pressed="{pressed}">'
+                     f'{html.escape(c["label"])}<em>{html.escape(c["sub"])}</em></button>')
+    ph = ' <span class="badge">placeholder music</span>' if a.get("placeholder") else ""
+    hint = "&mdash; headphones: each ear is fit on its own audiogram; loudness-matched"
+    srow = sii_row([(c["label"], c["sii"]) for c in a["conditions"]]).replace(
+        "ANSI SII (0–1):", "ANSI SII, poorer ear (0–1):")
+    return f"""
+    <section class="specimen subject" id="st-somha-{a['id']}" data-player>
+      <div class="sp-head"><span class="sp-num sub">&#9670;</span>
+        <div class="sp-title"><h2>{html.escape(a['name'])} <span class="kind">binaural &mdash; ours vs OpenMHA</span>{ph}</h2>
+        <p class="sp-blurb">Each ear fit on its own audiogram: our Rx against real <b>OpenMHA</b>
+        (NAL-NL2, DSL m[i/o], CAMFIT/CAM2), played in stereo at 65&nbsp;dB SPL.</p></div></div>
+      <figure class="paper omfig"><img alt="Audiogram, {html.escape(a['name'])}"
+        src="data:image/png;base64,{a['png']}"><figcaption>Audiogram (both ears)</figcaption></figure>
+      <div class="console"><div class="chips">{chips[0]}<span class="sep"></span>
+        <span class="ramp">{''.join(chips[1:])}</span></div>
+        {transport('Original').format(hint=hint)}
+        {srow}</div>
+      <div class="audio-pool" hidden>{''.join(audios)}</div>
+    </section>"""
+
+
+SUBJ_OMHA = "\n".join(subj_omha_section(x) for x in SO["subjects"])
 SUBJECTS = "\n".join(subject_section(s) for s in S["subjects"] if s["id"] != "ild")
 ILD = "\n".join(subject_section(s) for s in S["subjects"] if s["id"] == "ild")
 SHAPES = "\n".join(shape_section(i + 1, s) for i, s in enumerate(A["audiograms"]))
 OMHA = "\n".join(openmha_section(x) for x in O["audiograms"])
 RAIL_OMHA = "\n".join(f'<a href="#st-omha-{x["id"]}" data-spy="st-omha-{x["id"]}"><span>&#9670;</span>{html.escape(x["name"])}</a>'
                       for x in O["audiograms"])
+RAIL_SUBJ_OMHA = "\n".join(f'<a href="#st-somha-{x["id"]}" data-spy="st-somha-{x["id"]}"><span>&#9670;</span>{html.escape(x["name"])} &middot; binaural</a>'
+                           for x in SO["subjects"])
 RAIL_SUB = "\n".join(f'<a href="#st-{s["id"]}" data-spy="st-{s["id"]}"><span>&#9670;</span>{html.escape(s["name"])}</a>'
                      for s in S["subjects"])
 RAIL_SHAPE = "\n".join(f'<a href="#st-{s["id"]}" data-spy="st-{s["id"]}"><span>{i+1:02d}</span>{html.escape(s["name"])}</a>'
@@ -488,6 +519,7 @@ footer .warn{{border-left:2px solid var(--amber);padding-left:12px;margin-top:14
     <nav>{RAIL_SHAPE}</nav>
     <h3 class="mt">Ours vs OpenMHA</h3>
     <nav>{RAIL_OMHA}</nav>
+    <nav>{RAIL_SUBJ_OMHA}</nav>
     <div class="key">
       <div class="r"><span class="sw" style="background:var(--amber)"></span><b>Original</b>&nbsp;unaided</div>
       <div class="r"><span class="sw" style="background:var(--red)"></span><b>Right</b>&nbsp;ear fit</div>
@@ -507,6 +539,8 @@ footer .warn{{border-left:2px solid var(--amber);padding-left:12px;margin-top:14
 {SHAPES}
     <p class="band-label">Ours vs OpenMHA &mdash; real clinical prescriptions</p>
 {OMHA}
+    <p class="band-label">Subjects vs OpenMHA &mdash; binaural, each ear fit on its own audiogram</p>
+{SUBJ_OMHA}
 {TOOL_HTML}
   </main>
 </div>
