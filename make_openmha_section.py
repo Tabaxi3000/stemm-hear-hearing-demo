@@ -57,13 +57,14 @@ def aud_png(ag, path):
     for s in ("top","right"): ax.spines[s].set_visible(False)
     fig.tight_layout(pad=0.4); fig.savefig(path, transparent=True); plt.close(fig)
 
-def to_aac_b64(y16):
-    y32 = resample_poly(np.clip(y16, -0.985, 0.985), 2, 1)              # 16k -> 32k for AAC
+WEB = os.path.join(PROJ, "web"); AUD = os.path.join(WEB, "audio"); os.makedirs(AUD, exist_ok=True)
+def write_aac(y16, name):                                              # 16k -> 32k -> lazy .m4a file (URL)
+    y32 = resample_poly(np.clip(y16, -0.985, 0.985), 2, 1)
     with tempfile.TemporaryDirectory() as d:
         wavfile.write(f"{d}/a.wav", 32000, (np.clip(y32,-1,1)*32767).astype(np.int16))
-        subprocess.run(["afconvert","-f","m4af","-d","aac","-b","96000",f"{d}/a.wav",f"{d}/a.m4a"],
+        subprocess.run(["afconvert","-f","m4af","-d","aac","-b","96000",f"{d}/a.wav",os.path.join(AUD,name+".m4a")],
                        check=True, capture_output=True)
-        return base64.b64encode(open(f"{d}/a.m4a","rb").read()).decode()
+    return f"audio/{name}.m4a"
 def png_b64(p): return base64.b64encode(open(p,"rb").read()).decode()
 
 COND = [("original","Original","unaided","orig"), ("ours","Ours (Rx)","our prescriptive fit","rx"),
@@ -83,7 +84,9 @@ for aid, ag in AUDIOGRAMS.items():
     for k in ("ours","nal_nl2","dsl_mio","camfit"): clips[k] = match(raw[k], -20)
     p = os.path.join(SC, f"omha_{aid}.png"); aud_png(ag, p)
     out["audiograms"].append(dict(id=aid, name=NAME[aid], png=png_b64(p),
-        conditions=[dict(id=c, label=l, sub=s, cls=cl, aac=to_aac_b64(clips[c])) for c,l,s,cl in COND]))
+        conditions=[dict(id=c, label=l, sub=s, cls=cl,
+                         sii=round(float(sp.audibility(raw[c], SR, ag)), 2),
+                         file=write_aac(clips[c], f"omha_{aid}_{c}")) for c,l,s,cl in COND]))
     print(f"{aid}: rendered 5 conditions")
 
 out["validation_db"] = round(float(np.mean(valdiffs)), 1)

@@ -4,7 +4,8 @@
     cp <scratchpad>/assets.json <scratchpad>/subjects.json .
     python build_site.py            # -> index.html   (single file; GitHub Pages / Artifact ready)
 
-All audio + charts are embedded as base64 data URIs, so the page has no external requests.
+Charts are embedded (base64); audio is written to web/audio/*.m4a and lazy-loaded per section
+(IntersectionObserver) so the page ships tiny and fetches clips on demand.
 """
 import os, json, html, shutil
 
@@ -50,16 +51,22 @@ def transport(cur_label):
       <p class="cue"><span class="dot"></span><b class="cur">{cur_label}</b><span class="hint">{{hint}}</span></p>"""
 
 
+def sii_row(items):                                     # precomputed audibility per condition
+    return ('<div class="siirow"><b>Audibility (SII proxy, 0–1):</b> '
+            + "  &middot;  ".join(f"{html.escape(n)} {v:.2f}" for n, v in items) + "</div>")
+
+
 def shape_section(n, s):
     sid = s["id"]
-    audios = [f'<audio data-i="0" preload="auto" src="data:audio/mp4;base64,{A["original_aac"]}"></audio>']
+    audios = [f'<audio data-i="0" preload="none" src="{A["original_file"]}"></audio>']
     chips = ['<button class="chip c-orig" data-i="0" aria-pressed="true">Original<em>unaided</em></button>']
     for i, c in enumerate(s["conditions"], start=1):
-        audios.append(f'<audio data-i="{i}" preload="auto" src="data:audio/mp4;base64,{c["aac"]}"></audio>')
+        audios.append(f'<audio data-i="{i}" preload="none" src="{c["file"]}"></audio>')
         lab, sub, cls = COND[c["id"]]
         unit = '<span class="u">ms</span>' if c["id"].startswith("wdrc_") else ""
         chips.append(f'<button class="chip c-{cls}" data-i="{i}" aria-pressed="false">{lab}{unit}<em>{sub}</em></button>')
     hint = "&mdash; switch while it plays; position holds, so you A/B the same instant"
+    srow = sii_row([("Original", s["orig_sii"])] + [(COND[c["id"]][0], c["sii"]) for c in s["conditions"]])
     return f"""
     <section class="specimen" id="st-{sid}" data-player>
       <div class="sp-head"><span class="sp-num">{n:02d}</span>
@@ -73,7 +80,8 @@ def shape_section(n, s):
       </div>
       <div class="console"><div class="chips">{chips[0]}<span class="sep"></span>
         <span class="ramp">{''.join(chips[1:])}</span></div>
-        {transport('Original').format(hint=hint)}</div>
+        {transport('Original').format(hint=hint)}
+        {srow}</div>
       <div class="audio-pool" hidden>{''.join(audios)}</div>
     </section>"""
 
@@ -89,7 +97,7 @@ def subject_section(s):
                    if abs(ild) >= 1 else 'The two ears end up <b>nearly matched</b>.')
     audios, chips = [], []
     for i, c in enumerate(s["conditions"]):
-        audios.append(f'<audio data-i="{i}" preload="auto" src="data:audio/mp4;base64,{c["aac"]}"></audio>')
+        audios.append(f'<audio data-i="{i}" preload="none" src="{c["file"]}"></audio>')
         pressed = "true" if i == 0 else "false"
         chips.append(f'<button class="chip c-{c["cls"]}" data-i="{i}" aria-pressed="{pressed}">'
                      f'{html.escape(c["label"])}<em>{html.escape(c["sub"])}</em></button>')
@@ -120,11 +128,12 @@ def subject_section(s):
 def openmha_section(a):                                  # ours (Rx) vs OpenMHA rules on one loss
     audios, chips = [], []
     for i, c in enumerate(a["conditions"]):
-        audios.append(f'<audio data-i="{i}" preload="auto" src="data:audio/mp4;base64,{c["aac"]}"></audio>')
+        audios.append(f'<audio data-i="{i}" preload="none" src="{c["file"]}"></audio>')
         pressed = "true" if i == 0 else "false"
         chips.append(f'<button class="chip c-{c["cls"]}" data-i="{i}" aria-pressed="{pressed}">'
                      f'{html.escape(c["label"])}<em>{html.escape(c["sub"])}</em></button>')
     hint = "&mdash; loudness-matched; compare our fit to the clinical prescriptions"
+    srow = sii_row([(c["label"], c["sii"]) for c in a["conditions"]])
     return f"""
     <section class="specimen" id="st-omha-{a['id']}" data-player>
       <div class="sp-head"><span class="sp-num sub">&#9670;</span>
@@ -135,7 +144,8 @@ def openmha_section(a):                                  # ours (Rx) vs OpenMHA 
         src="data:image/png;base64,{a['png']}"><figcaption>Audiogram</figcaption></figure>
       <div class="console"><div class="chips">{chips[0]}<span class="sep"></span>
         <span class="ramp">{''.join(chips[1:])}</span></div>
-        {transport('Original').format(hint=hint)}</div>
+        {transport('Original').format(hint=hint)}
+        {srow}</div>
       <div class="audio-pool" hidden>{''.join(audios)}</div>
     </section>"""
 
@@ -485,6 +495,12 @@ footer .warn{{border-left:2px solid var(--amber);padding-left:12px;margin-top:14
     seek.addEventListener('input',function(){{var t=(seek.value/1000)*dur;pool.forEach(function(a){{a.currentTime=t;}});
       fill.style.width=(seek.value/10)+'%';tcur.textContent=fmt(t);}});
   }});
+  // lazy-load: fetch a section's audio only as it nears the viewport (page ships no inlined audio)
+  if('IntersectionObserver' in window){{
+    var lazyIO=new IntersectionObserver(function(es){{es.forEach(function(e){{
+      if(e.isIntersecting){{e.target.querySelectorAll('.audio-pool audio').forEach(function(a){{a.preload='auto';a.load();}});lazyIO.unobserve(e.target);}}}});}},{{rootMargin:'500px 0px'}});
+    document.querySelectorAll('[data-player]').forEach(function(s){{if(s.querySelector('.audio-pool'))lazyIO.observe(s);}});
+  }}
   var links={{}};document.querySelectorAll('.rail a').forEach(function(a){{links[a.dataset.spy]=a;}});
   if('IntersectionObserver' in window){{
     var io=new IntersectionObserver(function(es){{es.forEach(function(e){{if(e.isIntersecting){{

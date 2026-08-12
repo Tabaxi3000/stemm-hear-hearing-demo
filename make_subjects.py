@@ -81,13 +81,15 @@ def subject_io_png(sub, path):                                  # input/output c
     fig.tight_layout(pad=0.4); fig.savefig(path, transparent=True); plt.close(fig)
 
 # ---- stereo AAC encode ---------------------------------------------------------------
-def to_aac_b64(st):                                   # st: (N,2) float
-    st = np.clip(st, -0.985, 0.985)                   # encode at the true SR (32 kHz)
+WEB = "/Users/tabaxitft/Desktop/STEMM-HEAR/FILTER BANKS/speech_resynthesis/web"
+AUD = os.path.join(WEB, "audio"); os.makedirs(AUD, exist_ok=True)
+def write_aac(st, name):                              # st: (N,2) float -> lazy-loaded .m4a file (URL)
+    st = np.clip(st, -0.985, 0.985)
     with tempfile.TemporaryDirectory() as d:
         wavfile.write(f"{d}/a.wav", SR, (np.clip(st,-1,1)*32767).astype(np.int16))
-        subprocess.run(["afconvert","-f","m4af","-d","aac","-b","96000",f"{d}/a.wav",f"{d}/a.m4a"],
+        subprocess.run(["afconvert","-f","m4af","-d","aac","-b","96000",f"{d}/a.wav",os.path.join(AUD,name+".m4a")],
                        check=True, capture_output=True)
-        return base64.b64encode(open(f"{d}/a.m4a","rb").read()).decode()
+    return f"audio/{name}.m4a"
 def png_b64(p): return base64.b64encode(open(p,"rb").read()).decode()
 def diotic(mono): return np.stack([mono, mono], 1)
 
@@ -111,7 +113,7 @@ for sub in SUBJECTS:
         id=sub["id"], name=sub["name"], kind=sub["kind"], blurb=sub["blurb"],
         placeholder=(sub["src"]=="music"), ild_db=round(float(ild),1),
         png=png_b64(agp), io=png_b64(iop),
-        conditions=[dict(id=c, label=l, sub=s, cls=cl, aac=to_aac_b64(a)) for c,l,s,cl,a in conds]))
+        conditions=[dict(id=c, label=l, sub=s, cls=cl, file=write_aac(a, f"subj_{sub['id']}_{c}")) for c,l,s,cl,a in conds]))
     print(f"{sub['name']:12s} rendered | aided R-L level diff {ild:+.1f} dB")
 
 # ---- ILD / localization demo: a panned talker, independent vs linked compression -----
@@ -147,7 +149,7 @@ out["subjects"].append(dict(
           "pull the loud ear down and shrink that cue &mdash; the talker drifts toward centre; linking the "
           "compression to a shared level preserves it.",
     figcap="Output interaural level difference", png=png_b64(ildp),
-    conditions=[dict(id=c, label=l, sub=s, cls=cl, aac=to_aac_b64(a)) for c,l,s,cl,a in condsI]))
+    conditions=[dict(id=c, label=l, sub=s, cls=cl, file=write_aac(a, f"ild_{c}")) for c,l,s,cl,a in condsI]))
 
 json.dump(out, open(os.path.join(SC, "subjects.json"), "w"))
 print("wrote subjects.json  %.2f MB" % (os.path.getsize(os.path.join(SC,"subjects.json"))/1e6))

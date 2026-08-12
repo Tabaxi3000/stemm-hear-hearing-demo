@@ -132,26 +132,30 @@ for k, w in clips.items():
     print(f"   {k:26s} rms {20*np.log10(_rms(w)):6.1f}   peak {20*np.log10(np.max(np.abs(w))+1e-12):6.1f}")
 
 # ---- 5. encode wav(16k) -> 44.1k AAC m4a -> base64 -----------------------------------
-def to_aac_b64(y):
-    y = np.clip(y, -0.985, 0.985)                         # encode at the true SR (32 kHz); afconvert supports it
+WEB = "/Users/tabaxitft/Desktop/STEMM-HEAR/FILTER BANKS/speech_resynthesis/web"
+AUD = os.path.join(WEB, "audio"); os.makedirs(AUD, exist_ok=True)
+
+def write_aac(y, name):                                   # write a lazy-loaded .m4a file, return its URL
+    y = np.clip(y, -0.985, 0.985)
     with tempfile.TemporaryDirectory() as d:
         wavfile.write(f"{d}/a.wav", SR, (np.clip(y, -1, 1) * 32767).astype(np.int16))
         subprocess.run(["afconvert", "-f", "m4af", "-d", "aac", "-b", "96000",
-                        f"{d}/a.wav", f"{d}/a.m4a"], check=True, capture_output=True)
-        return base64.b64encode(open(f"{d}/a.m4a", "rb").read()).decode()
+                        f"{d}/a.wav", os.path.join(AUD, name + ".m4a")], check=True, capture_output=True)
+    return f"audio/{name}.m4a"
 
 def png_b64(path):
     return base64.b64encode(open(path, "rb").read()).decode()
 
-assets = {"original_aac": to_aac_b64(clips["original"]), "audiograms": []}
+assets = {"original_file": write_aac(clips["original"], "shape_original"), "audiograms": []}
 for A in AUDIOGRAMS:
     pth = os.path.join(SC, f"ag_{A['id']}.png"); audiogram_png(A["ag"], pth)
     cpth = os.path.join(SC, f"comp_{A['id']}.png"); comp_png(A["ag"], cpth)
-    conds = [{"id": cid, "label": lbl, "aac": to_aac_b64(clips[f"{A['id']}__{cid}"])}
+    conds = [{"id": cid, "label": lbl, "sii": round(float(sp.audibility(raw[f"{A['id']}__{cid}"], SR, A["ag"])), 2),
+              "file": write_aac(clips[f"{A['id']}__{cid}"], f"shape_{A['id']}_{cid}")}
              for cid, lbl, _ in CONDITIONS]
     assets["audiograms"].append(dict(id=A["id"], name=A["name"], blurb=A["blurb"],
-                                     png=png_b64(pth), comp=png_b64(cpth), conditions=conds))
+                                     png=png_b64(pth), comp=png_b64(cpth),
+                                     orig_sii=round(float(sp.audibility(x65, SR, A["ag"])), 2), conditions=conds))
 
 json.dump(assets, open(os.path.join(SC, "assets.json"), "w"))
-tot = os.path.getsize(os.path.join(SC, "assets.json"))
-print("wrote assets.json  %.2f MB (base64)" % (tot / 1e6))
+print("wrote assets.json  %.3f MB (files in web/audio)" % (os.path.getsize(os.path.join(SC, "assets.json")) / 1e6))
