@@ -26,7 +26,7 @@ __all__ = [
     "GenericGainMap",
     "EXAMPLE_AUDIOGRAM", "audiogram_thresholds", "PersonalizedGainMap", "PrescriptiveGain", "PersonalizedWDRC",
     "time_stretch", "frequency_compress",
-    "run", "binaural", "make_speech_like", "HearingLossSim", "audibility", "add_noise", "denoise",
+    "run", "binaural", "make_speech_like", "HearingLossSim", "audibility", "add_noise", "denoise", "official_sii",
 ]
 
 # --------------------------------------------------------------------------- #
@@ -635,6 +635,26 @@ def audibility(x, sr, audiogram, loud_ref=None, n_bands=24, flo=100.0, fhi=None)
     aud = np.clip((lvl - thr) / 30.0, 0.0, 1.0)                     # fraction of 30 dB speech range audible
     imp = np.exp(-0.5 * ((np.log10(fc) - np.log10(1800.0)) / 0.42) ** 2)     # speech-importance ~ peak 1.8 kHz
     return float((imp * aud).sum() / imp.sum())
+
+
+def official_sii(aided, unaided, sr, audiogram):
+    """Authoritative ANSI S3.5 Speech Intelligibility Index (Malcolm Slaney's speech_intelligibility_index
+    package) for a fit: feed the aid's per-band INSERTION GAIN (aided minus unaided band levels, so
+    absolute calibration cancels) into the standard normal speech spectrum + the listener's audiogram.
+    Falls back to the vendored `sii.py` (used in the browser) if the pip package isn't installed."""
+    try:
+        from speech_intelligibility_index import sii as _S
+    except ImportError:
+        import sii as _S
+    mbf = np.asarray(_S.mid_band_freqs, float)                  # 18 one-third-octave bands
+    def _blev(y):
+        Y = np.abs(np.fft.rfft(y * np.hanning(len(y)))) ** 2
+        f = np.fft.rfftfreq(len(y), 1.0 / sr)
+        return np.array([10.0 * np.log10(Y[(f >= fc / 2 ** (1/6)) & (f < fc * 2 ** (1/6))].sum() + 1e-12) for fc in mbf])
+    ig = _blev(np.asarray(aided, float)) - _blev(np.asarray(unaided, float))
+    thr = audiogram_thresholds(mbf, audiogram)
+    E, N, T = _S.input_5p1('normal', insertion_gain=ig, hearing_threshold=thr)
+    return float(_S.sii(E, N, T))
 
 
 def add_noise(x, snr_db=5.0, kind="ssn", seed=0):

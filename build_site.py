@@ -200,6 +200,9 @@ TOOL_CSS = """
 .dl{color:var(--teal);text-decoration:none;border-bottom:1px solid color-mix(in srgb,var(--teal) 40%,transparent);cursor:pointer}
 .engine{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:12px;padding-top:9px;border-top:1px dashed var(--line)}
 .ctlnote{font-size:11px;color:var(--muted);margin:0 0 12px;line-height:1.45}
+.quickstart{font-size:12.5px;color:var(--ink-2);background:color-mix(in srgb,var(--teal) 7%,transparent);
+  border:1px solid var(--line);border-radius:10px;padding:11px 14px;margin:0 0 18px;line-height:1.5}
+.quickstart b{color:var(--ink)}
 .spec{display:block;width:100%;height:auto;margin-top:12px;background:var(--paper);border:1px solid var(--line);border-radius:8px}
 @media (max-width:560px){.tool-grid{grid-template-columns:1fr}.agwrap{flex-direction:column}}
 """
@@ -214,6 +217,10 @@ TOOL_HTML = f"""
         module</b> in your browser via Pyodide (numpy/scipy in WebAssembly), so the output is notebook-identical;
         the first run downloads ~30&nbsp;MB and falls back to a JS approximation if that can't load. Nothing is
         uploaded &mdash; it all runs on your machine.</p></div></div>
+      <p class="quickstart"><b>Quick start:</b> pick an audiogram preset (or drag the sliders) &rarr;
+        <b>Choose audio</b> &rarr; <b>Process</b>, then click the tabs to A/B. Set your volume so <b>Original</b>
+        is comfortable &mdash; it's presented at ~65&nbsp;dB&nbsp;SPL (normal conversation), and the fits lift it
+        from there. SII numbers are the <b>official ANSI S3.5</b> index.</p>
       <div class="tool-grid">
         <div class="panel">
           <label class="filebtn">Choose audio<input type="file" id="tf" accept="audio/*"></label>
@@ -223,6 +230,9 @@ TOOL_HTML = f"""
             <button data-preset="flat">flat 40</button><button data-preset="ski">ski-slope</button></div>
           <div class="agwrap"><canvas id="agc" width="290" height="170"></canvas>
             <div class="sliders" id="sliders"></div></div>
+          <div class="rowctl"><label for="prog">Program</label>
+            <select id="prog"><option value="speech" selected>speech</option>
+            <option value="music">music (slow release)</option></select><span>music = wide dynamics</span></div>
           <div class="rowctl"><label for="rel">WDRC release</label>
             <input type="range" id="rel" min="20" max="600" step="10" value="150"><span id="relv">150 ms</span></div>
           <div class="rowctl"><label for="level">Input level</label>

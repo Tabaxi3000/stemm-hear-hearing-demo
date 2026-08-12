@@ -30,7 +30,7 @@
     var el = $("siirow"); if (!el) return;
     if (!si) { el.style.display = "none"; return; }
     var L = ["Original","Static","WDRC","Rx","NAL","DSL","Pers"];
-    el.innerHTML = '<b>Audibility (SII proxy, 0–1):</b> ' +
+    el.innerHTML = '<b>ANSI SII (0–1):</b> ' +
       L.map(function (n, i) { return n + " " + (si[i] != null ? si[i].toFixed(2) : "–"); }).join("  ·  ");
     el.style.display = "";
   }
@@ -124,11 +124,12 @@
     return loadScript(U + "pyodide.js")
       .then(function () { return loadPyodide({ indexURL: U }); })
       .then(function (py) { pyodide = py; engine("engine: loading numpy / scipy…"); return py.loadPackage(["numpy", "scipy"]); })
-      .then(function () { return Promise.all([fetch("./speech_resynth.py"), fetch("./fitting.py")]); })
-      .then(function (rs) { if (!rs[0].ok || !rs[1].ok) throw new Error("module fetch failed"); return Promise.all([rs[0].text(), rs[1].text()]); })
+      .then(function () { return Promise.all([fetch("./speech_resynth.py"), fetch("./fitting.py"), fetch("./sii.py")]); })
+      .then(function (rs) { if (!rs[0].ok || !rs[1].ok || !rs[2].ok) throw new Error("module fetch failed"); return Promise.all([rs[0].text(), rs[1].text(), rs[2].text()]); })
       .then(function (srcs) {
         pyodide.FS.writeFile("speech_resynth.py", srcs[0]);
         pyodide.FS.writeFile("fitting.py", srcs[1]);
+        pyodide.FS.writeFile("sii.py", srcs[2]);                        // vendored ANSI SII (Malcolm Slaney)
         pyodide.runPython("import numpy as np\nimport speech_resynth as sp\nimport fitting");
         pyReady = true; pyBooting = false; engine("engine: exact — Python (numpy / scipy) + OpenMHA-style fittings");
       })
@@ -153,13 +154,11 @@
     "GAINS = {'static': (pm, False), 'wdrc': (pm, True), 'rx': (sp.PrescriptiveGain(fc, ag), True),",
     "         'nal': (fitting.GainTableWDRC(fc, ag, 'nal_nl2'), True), 'dsl': (fitting.GainTableWDRC(fc, ag, 'dsl_mio'), True),",
     "         'per': (sp.PersonalizedWDRC(fc, audiogram=ag, airbone_gap=gap, ohc_health=ohc), True)}",   // bone/OHC-aware
-    "def _sii(Lo):",                                                              // audibility from the run matrix (cheap)
-    "    bl = 10*np.log10(np.mean(10**(Lo/10), axis=1) + 1e-12)",
-    "    return round(float((imp*np.clip((bl-thr)/30.0, 0, 1)).sum()/imp.sum()), 2)",
-    "OUT = {'original': xin2.astype('float32')}; SII = {'original': round(sp.audibility(xin2, sr, ag), 2)}",
+    "rel_eff = 800.0 if prog == 'music' else float(rel)",                          // music program: slow release for wide dynamics
+    "OUT = {'original': xin2.astype('float32')}; SII = {'original': round(sp.official_sii(xin2, xin2, sr, ag), 2)}",
     "for _k,(_g,_dyn) in GAINS.items():",
-    "    _r = sp.run(xfit, sr, gain=_g, attack_ms=(5 if _dyn else None), release_ms=(rel if _dyn else None), **cm)",
-    "    OUT[_k] = _r['waveform'].astype('float32'); SII[_k] = _sii(_r['matrix']['level_out'])",
+    "    _r = sp.run(xfit, sr, gain=_g, attack_ms=(5 if _dyn else None), release_ms=(rel_eff if _dyn else None), **cm)",
+    "    OUT[_k] = _r['waveform'].astype('float32'); SII[_k] = round(sp.official_sii(_r['waveform'], xin2, sr, ag), 2)",
     "if losssim:",                                                               // 'hear it as the patient does'
     "    LS = sp.HearingLossSim(fc, ag)",
     "    for _k in list(OUT): OUT[_k] = sp.run(np.asarray(OUT[_k], dtype=float), sr, gain=LS, **cm)['waveform'].astype('float32')",
@@ -172,7 +171,8 @@
              flow: $("flow") ? +$("flow").value : 1, loss: $("losssim") ? $("losssim").checked : false,
              gap: $("gap") ? +$("gap").value : 0, ohc: $("ohc") ? +$("ohc").value / 100 : 0,
              levels: !!($("levels") && $("levels").value === "real"),
-             noise: $("noise") ? +$("noise").value : -1, nr: !!($("nr") && $("nr").checked) };
+             noise: $("noise") ? +$("noise").value : -1, nr: !!($("nr") && $("nr").checked),
+             prog: $("prog") ? $("prog").value : "speech" };
   }
   function runEngine() {
     var o = opts();
@@ -184,6 +184,7 @@
       pyodide.globals.set("spl", o.spl); pyodide.globals.set("flow", o.flow); pyodide.globals.set("losssim", o.loss);
       pyodide.globals.set("gap", o.gap); pyodide.globals.set("ohc", o.ohc);
       pyodide.globals.set("noise", o.noise); pyodide.globals.set("nr", o.nr);
+      pyodide.globals.set("prog", o.prog);
       pyodide.runPython(PYCODE);
       var G = function (n) { return Float32Array.from(pyodide.globals.get(n).toJs()); };
       return Promise.resolve({ original: G("yo"), static: G("ys"), wdrc: G("yw"), rx: G("yr"), nal: G("yn"), dsl: G("yd"), per: G("yp"),
