@@ -9,10 +9,12 @@ All audio + charts are embedded as base64 data URIs, so the page has no external
 import os, json, html, shutil
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-# keep a copy of the real module next to the site so the in-browser tool (Pyodide) can fetch it
+# keep copies of the real modules next to the site so the in-browser tool (Pyodide) can fetch them
 shutil.copy(os.path.join(HERE, "..", "colab", "speech_resynth.py"), os.path.join(HERE, "speech_resynth.py"))
+shutil.copy(os.path.join(HERE, "..", "openmha", "fitting.py"), os.path.join(HERE, "fitting.py"))
 A = json.load(open(os.path.join(HERE, "assets.json")))
 S = json.load(open(os.path.join(HERE, "subjects.json")))
+O = json.load(open(os.path.join(HERE, "openmha_section.json")))
 
 BLURB = {
     "sloping":  "Gentle high-frequency slope; near-normal lows.",
@@ -115,9 +117,35 @@ def subject_section(s):
     </section>"""
 
 
+def openmha_section(a):                                  # ours (Rx) vs OpenMHA rules on one loss
+    audios, chips = [], []
+    for i, c in enumerate(a["conditions"]):
+        audios.append(f'<audio data-i="{i}" preload="auto" src="data:audio/mp4;base64,{c["aac"]}"></audio>')
+        pressed = "true" if i == 0 else "false"
+        chips.append(f'<button class="chip c-{c["cls"]}" data-i="{i}" aria-pressed="{pressed}">'
+                     f'{html.escape(c["label"])}<em>{html.escape(c["sub"])}</em></button>')
+    hint = "&mdash; loudness-matched; compare our fit to the clinical prescriptions"
+    return f"""
+    <section class="specimen" id="st-omha-{a['id']}" data-player>
+      <div class="sp-head"><span class="sp-num sub">&#9670;</span>
+        <div class="sp-title"><h2>{html.escape(a['name'])} <span class="kind">ours vs OpenMHA</span></h2>
+        <p class="sp-blurb">Our Rx fit against real <b>OpenMHA</b> running NAL-NL2, DSL m[i/o] and CAMFIT,
+        on the same clip at 65&nbsp;dB SPL.</p></div></div>
+      <figure class="paper omfig"><img alt="Audiogram, {html.escape(a['name'])}"
+        src="data:image/png;base64,{a['png']}"><figcaption>Audiogram</figcaption></figure>
+      <div class="console"><div class="chips">{chips[0]}<span class="sep"></span>
+        <span class="ramp">{''.join(chips[1:])}</span></div>
+        {transport('Original').format(hint=hint)}</div>
+      <div class="audio-pool" hidden>{''.join(audios)}</div>
+    </section>"""
+
+
 SUBJECTS = "\n".join(subject_section(s) for s in S["subjects"] if s["id"] != "ild")
 ILD = "\n".join(subject_section(s) for s in S["subjects"] if s["id"] == "ild")
 SHAPES = "\n".join(shape_section(i + 1, s) for i, s in enumerate(A["audiograms"]))
+OMHA = "\n".join(openmha_section(x) for x in O["audiograms"])
+RAIL_OMHA = "\n".join(f'<a href="#st-omha-{x["id"]}" data-spy="st-omha-{x["id"]}"><span>&#9670;</span>{html.escape(x["name"])}</a>'
+                      for x in O["audiograms"])
 RAIL_SUB = "\n".join(f'<a href="#st-{s["id"]}" data-spy="st-{s["id"]}"><span>&#9670;</span>{html.escape(s["name"])}</a>'
                      for s in S["subjects"])
 RAIL_SHAPE = "\n".join(f'<a href="#st-{s["id"]}" data-spy="st-{s["id"]}"><span>{i+1:02d}</span>{html.escape(s["name"])}</a>'
@@ -163,7 +191,7 @@ TOOL_HTML = f"""
       <div class="sp-head"><span class="sp-num sub">&#9881;</span>
         <div class="sp-title"><h2>Try your own <span class="kind">upload · in-browser · exact</span></h2>
         <p class="sp-blurb">Upload a WAV or MP3, set an audiogram, and hear it re-synthesised &mdash; Original
-        vs Static vs WDRC vs a realistic <b>Rx</b> fit (half-gain + rolloff + limiting), at 32&nbsp;kHz with the bank running to 12&nbsp;kHz. It runs the <b>real Python
+        vs Static vs WDRC vs a realistic <b>Rx</b> fit vs OpenMHA-style <b>NAL-NL2</b> / <b>DSL</b>, at 32&nbsp;kHz with the bank running to 12&nbsp;kHz. It runs the <b>real Python
         module</b> in your browser via Pyodide (numpy/scipy in WebAssembly), so the output is notebook-identical;
         the first run downloads ~30&nbsp;MB and falls back to a JS approximation if that can't load. Nothing is
         uploaded &mdash; it all runs on your machine.</p></div></div>
@@ -190,6 +218,8 @@ TOOL_HTML = f"""
               <button class="chip c-static" data-i="1" aria-pressed="false" disabled>Static<em>no dynamics</em></button>
               <button class="chip c-med" data-i="2" aria-pressed="false" disabled>WDRC<em>attack/release</em></button>
               <button class="chip c-rx" data-i="3" aria-pressed="false" disabled>Rx<em>realistic fit</em></button>
+              <button class="chip c-nal" data-i="4" aria-pressed="false" disabled>NAL-NL2<em>OpenMHA-style</em></button>
+              <button class="chip c-dsl" data-i="5" aria-pressed="false" disabled>DSL<em>OpenMHA-style</em></button>
             </span>
           </div>
           <div class="transport">
@@ -202,7 +232,8 @@ TOOL_HTML = f"""
             process a file, then switch to compare</span></p>
           <div class="dlrow" id="dlrow" style="display:none">download:
             <a id="dl_original" class="dl">original.wav</a><a id="dl_static" class="dl">static.wav</a>
-            <a id="dl_wdrc" class="dl">wdrc.wav</a><a id="dl_rx" class="dl">rx.wav</a></div>
+            <a id="dl_wdrc" class="dl">wdrc.wav</a><a id="dl_rx" class="dl">rx.wav</a>
+            <a id="dl_nal" class="dl">nal.wav</a><a id="dl_dsl" class="dl">dsl.wav</a></div>
         </div>
       </div>
     </section>"""
@@ -214,7 +245,7 @@ DOC = f"""<title>Band-by-band compression &mdash; a WDRC listening catalogue</ti
   --bg:#ECF1F0; --paper:#FCFDFC; --panel:#FBFDFC;
   --ink:#101B1A; --ink-2:#3B4B49; --muted:#69807C; --line:#D5E0DD;
   --teal:#22706F; --teal-2:#0E3B3B; --teal-3:#8FBDBB; --amber:#9C6A1E;
-  --red:#C0392B; --blue:#2C6FB0; --rx:#3F7D54;
+  --red:#C0392B; --blue:#2C6FB0; --rx:#3F7D54; --nal:#6A5ACD; --dsl:#B5651D; --cam:#3F6E8C;
   --c-static:#5F817F; --c-fast:#8FBDBB; --c-med:#22706F; --c-slow:#0E3B3B;
   --mono:ui-monospace,"SF Mono","Roboto Mono",Menlo,Consolas,monospace;
   --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
@@ -224,16 +255,16 @@ DOC = f"""<title>Band-by-band compression &mdash; a WDRC listening catalogue</ti
 @media (prefers-color-scheme:dark){{ :root{{
   --bg:#0B1413; --paper:#FCFDFC; --panel:#111E1C; --ink:#E6EEEC; --ink-2:#B3C4C1;
   --muted:#7E938F; --line:#213230; --teal:#4FA3A2; --teal-2:#78C4C3; --teal-3:#2E524F;
-  --amber:#C89A54; --red:#E0685A; --blue:#5E9BD6; --rx:#5FA877;
+  --amber:#C89A54; --red:#E0685A; --blue:#5E9BD6; --rx:#5FA877; --nal:#9A8CE0; --dsl:#D08A4A; --cam:#6F9BB8;
   --c-static:#89A6A3; --c-fast:#2E524F; --c-med:#4FA3A2; --c-slow:#78C4C3;
   --sh:0 1px 1px rgba(0,0,0,.4),0 12px 30px -16px rgba(0,0,0,.7);
 }} }}
 :root[data-theme="light"]{{ --bg:#ECF1F0;--paper:#FCFDFC;--panel:#FBFDFC;--ink:#101B1A;--ink-2:#3B4B49;
   --muted:#69807C;--line:#D5E0DD;--teal:#22706F;--teal-2:#0E3B3B;--teal-3:#8FBDBB;--amber:#9C6A1E;
-  --red:#C0392B;--blue:#2C6FB0;--rx:#3F7D54;--c-static:#5F817F;--c-fast:#8FBDBB;--c-med:#22706F;--c-slow:#0E3B3B; }}
+  --red:#C0392B;--blue:#2C6FB0;--rx:#3F7D54;--nal:#6A5ACD;--dsl:#B5651D;--cam:#3F6E8C;--c-static:#5F817F;--c-fast:#8FBDBB;--c-med:#22706F;--c-slow:#0E3B3B; }}
 :root[data-theme="dark"]{{ --bg:#0B1413;--paper:#FCFDFC;--panel:#111E1C;--ink:#E6EEEC;--ink-2:#B3C4C1;
   --muted:#7E938F;--line:#213230;--teal:#4FA3A2;--teal-2:#78C4C3;--teal-3:#2E524F;--amber:#C89A54;
-  --red:#E0685A;--blue:#5E9BD6;--rx:#5FA877;--c-static:#89A6A3;--c-fast:#2E524F;--c-med:#4FA3A2;--c-slow:#78C4C3; }}
+  --red:#E0685A;--blue:#5E9BD6;--rx:#5FA877;--nal:#9A8CE0;--dsl:#D08A4A;--cam:#6F9BB8;--c-static:#89A6A3;--c-fast:#2E524F;--c-med:#4FA3A2;--c-slow:#78C4C3; }}
 
 *{{box-sizing:border-box}} html{{scroll-behavior:smooth}}
 @media (prefers-reduced-motion:reduce){{ html{{scroll-behavior:auto}} *{{transition:none!important}} }}
@@ -306,6 +337,8 @@ figure.paper figcaption{{font-family:var(--mono);font-size:10px;letter-spacing:.
 .c-med[aria-pressed="true"]{{background:var(--c-med)}} .c-slow[aria-pressed="true"]{{background:var(--c-slow)}}
 .c-left[aria-pressed="true"]{{background:var(--blue)}} .c-right[aria-pressed="true"]{{background:var(--red)}}
 .c-bin[aria-pressed="true"]{{background:var(--teal)}} .c-rx[aria-pressed="true"]{{background:var(--rx)}}
+.c-nal[aria-pressed="true"]{{background:var(--nal)}} .c-dsl[aria-pressed="true"]{{background:var(--dsl)}} .c-cam[aria-pressed="true"]{{background:var(--cam)}}
+.omfig{{max-width:400px;margin:22px 0}}
 
 .transport{{display:flex;align-items:center;gap:15px;margin:16px 0 0}}
 .play{{flex:none;width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;background:var(--teal);
@@ -357,6 +390,8 @@ footer .warn{{border-left:2px solid var(--amber);padding-left:12px;margin-top:14
     <nav>{RAIL_SUB}</nav>
     <h3 class="mt">Textbook shapes</h3>
     <nav>{RAIL_SHAPE}</nav>
+    <h3 class="mt">Ours vs OpenMHA</h3>
+    <nav>{RAIL_OMHA}</nav>
     <div class="key">
       <div class="r"><span class="sw" style="background:var(--amber)"></span><b>Original</b>&nbsp;unaided</div>
       <div class="r"><span class="sw" style="background:var(--red)"></span><b>Right</b>&nbsp;ear fit</div>
@@ -374,6 +409,8 @@ footer .warn{{border-left:2px solid var(--amber);padding-left:12px;margin-top:14
 {ILD}
     <p class="band-label">Textbook shapes &mdash; static vs WDRC, release swept</p>
 {SHAPES}
+    <p class="band-label">Ours vs OpenMHA &mdash; real clinical prescriptions</p>
+{OMHA}
 {TOOL_HTML}
   </main>
 </div>
@@ -391,6 +428,11 @@ footer .warn{{border-left:2px solid var(--amber);padding-left:12px;margin-top:14
   <b>Musician A</b> uses a real audiogram (the music is a synthesised placeholder for now);
   <b>Speech A</b> pairs a real speech clip with a <b>placeholder audiogram</b> until the subject's own
   is available.</p>
+  <p><b>Ours vs OpenMHA:</b> the gallery section runs <b>real OpenMHA</b> (its dc_simple compressor).
+  <b>CAMFIT</b> is OpenMHA's own authoritative rule (computed by its <span style="font-family:var(--mono)">gainrule_camfit_compr</span>);
+  <b>NAL-NL2</b> and <b>DSL</b> use published approximations, since the exact vendor rules aren't public.
+  The "Try your own" tool reproduces NAL-NL2 / DSL in Python (same gaintables, our compressor) &mdash;
+  within ~5&nbsp;dB of OpenMHA's processing on our test clips.</p>
   <p class="warn"><b>Research prototype &mdash; not a medical device or a fitting.</b> Processing is offline
   and played to normal-hearing ears, so it shows the aid's output, not what an impaired listener perceives.
   On a steep loss, fully lifting the highs to threshold over-amplifies sibilants; a real fit would use

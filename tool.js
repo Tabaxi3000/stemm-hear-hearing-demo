@@ -83,12 +83,13 @@
     return loadScript(U + "pyodide.js")
       .then(function () { return loadPyodide({ indexURL: U }); })
       .then(function (py) { pyodide = py; engine("engine: loading numpy / scipy…"); return py.loadPackage(["numpy", "scipy"]); })
-      .then(function () { return fetch("./speech_resynth.py"); })
-      .then(function (r) { if (!r.ok) throw new Error("module fetch " + r.status); return r.text(); })
-      .then(function (src) {
-        pyodide.FS.writeFile("speech_resynth.py", src);
-        pyodide.runPython("import numpy as np\nimport speech_resynth as sp");
-        pyReady = true; pyBooting = false; engine("engine: exact — Python (numpy / scipy)");
+      .then(function () { return Promise.all([fetch("./speech_resynth.py"), fetch("./fitting.py")]); })
+      .then(function (rs) { if (!rs[0].ok || !rs[1].ok) throw new Error("module fetch failed"); return Promise.all([rs[0].text(), rs[1].text()]); })
+      .then(function (srcs) {
+        pyodide.FS.writeFile("speech_resynth.py", srcs[0]);
+        pyodide.FS.writeFile("fitting.py", srcs[1]);
+        pyodide.runPython("import numpy as np\nimport speech_resynth as sp\nimport fitting");
+        pyReady = true; pyBooting = false; engine("engine: exact — Python (numpy / scipy) + OpenMHA-style fittings");
       })
       .catch(function (e) { pyFailed = true; pyBooting = false;
         engine("engine: approximate — JS fallback (Python unavailable)"); console.warn("Pyodide failed:", e); });
@@ -103,7 +104,9 @@
     "x65 = x / (np.sqrt(np.mean(x**2)) + 1e-12) * 10**((65 - 100) / 20)",
     "ys = sp.run(x65, sr, gain=pm, **cm)['waveform'].astype('float32')",
     "yw = sp.run(x65, sr, gain=pm, attack_ms=5, release_ms=rel, **cm)['waveform'].astype('float32')",
-    "yr = sp.run(x65, sr, gain=sp.PrescriptiveGain(fc, ag), attack_ms=5, release_ms=rel, **cm)['waveform'].astype('float32')"
+    "yr = sp.run(x65, sr, gain=sp.PrescriptiveGain(fc, ag), attack_ms=5, release_ms=rel, **cm)['waveform'].astype('float32')",
+    "yn = sp.run(x65, sr, gain=fitting.GainTableWDRC(fc, ag, 'nal_nl2'), attack_ms=5, release_ms=rel, **cm)['waveform'].astype('float32')",
+    "yd = sp.run(x65, sr, gain=fitting.GainTableWDRC(fc, ag, 'dsl_mio'), attack_ms=5, release_ms=rel, **cm)['waveform'].astype('float32')"
   ].join("\n");
 
   function runEngine() {                               // -> Promise<{static,wdrc}>
@@ -114,11 +117,10 @@
       pyodide.globals.set("agv", pyodide.toPy(ag));
       pyodide.globals.set("sr", SR); pyodide.globals.set("rel", relMs);
       pyodide.runPython(PYCODE);
-      var ys = pyodide.globals.get("ys").toJs(), yw = pyodide.globals.get("yw").toJs(),
-          yr = pyodide.globals.get("yr").toJs();
-      return Promise.resolve({ static: Float32Array.from(ys), wdrc: Float32Array.from(yw), rx: Float32Array.from(yr) });
+      var G = function (n) { return Float32Array.from(pyodide.globals.get(n).toJs()); };
+      return Promise.resolve({ static: G("ys"), wdrc: G("yw"), rx: G("yr"), nal: G("yn"), dsl: G("yd") });
     }
-    var opt = { agFreqs: FREQS, agVals: ag, presentSPL: 65, nBands: 32 };     // JS fallback
+    var opt = { agFreqs: FREQS, agVals: ag, presentSPL: 65, nBands: 32 };     // JS fallback (no NAL/DSL)
     return Promise.resolve({
       static: DSP.process(input, SR, Object.assign({ mode: "static" }, opt)),
       wdrc: DSP.process(input, SR, Object.assign({ mode: "wdrc", attackMs: 5, releaseMs: relMs }, opt)),
@@ -159,7 +161,7 @@
     if (i === active || !pool[i]) return; var f = pool[active], t = pool[i];
     if (f) { f.pause(); t.currentTime = f.currentTime; } active = i;
     document.querySelectorAll("#tchips .chip").forEach(function (c) { c.setAttribute("aria-pressed", c.dataset.i == i); });
-    $("tcur").textContent = ["Original", "Static", "WDRC", "Rx"][i]; if (on) t.play();
+    $("tcur").textContent = ["Original", "Static", "WDRC", "Rx", "NAL-NL2", "DSL"][i]; if (on) t.play();
   }
 
   function process() {
@@ -172,16 +174,22 @@
       clips.static = normalize(r.static, -20);
       clips.wdrc = normalize(r.wdrc, -20);
       clips.rx = normalize(r.rx, -20);
-      ["original", "static", "wdrc", "rx"].forEach(function (k, i) {
+      clips.nal = r.nal ? normalize(r.nal, -20) : null;
+      clips.dsl = r.dsl ? normalize(r.dsl, -20) : null;
+      ["original", "static", "wdrc", "rx", "nal", "dsl"].forEach(function (k, i) {
+        var chip = document.querySelector('#tchips .chip[data-i="' + i + '"]');
+        var dl = $("dl_" + k);
+        if (!clips[k]) { if (chip) chip.disabled = true; if (dl) dl.style.display = "none"; return; }
         if (urls[k]) URL.revokeObjectURL(urls[k]);
         urls[k] = URL.createObjectURL(toWav(clips[k], SR));
-        pool[i].src = urls[k];
-        var dl = $("dl_" + k); dl.href = urls[k]; dl.download = (fileName.replace(/\.[^.]+$/, "") || "clip") + "_" + k + ".wav";
+        pool[i].src = urls[k]; if (chip) chip.disabled = false;
+        if (dl) { dl.href = urls[k]; dl.download = (fileName.replace(/\.[^.]+$/, "") || "clip") + "_" + k + ".wav"; dl.style.display = ""; }
       });
       dur = input.length / SR;
-      document.querySelectorAll("#tchips .chip").forEach(function (c) { c.disabled = false; });
       $("dlrow").style.display = "flex"; $("tplay").disabled = false;
-      active = 0; switchTo(0); status("done — A/B the three below"); $("run").disabled = false;
+      active = 0; switchTo(0);
+      status(r.nal ? "done — A/B all six" : "done — NAL/DSL need the Python engine (still loading / unavailable)");
+      $("run").disabled = false;
     }).catch(function (e) { status("processing failed: " + e.message); console.error(e); $("run").disabled = false; });
   }
 
@@ -194,7 +202,7 @@
     document.querySelectorAll("[data-preset]").forEach(function (b) {
       b.addEventListener("click", function () { preset(b.dataset.preset); }); });
     $("run").addEventListener("click", process);
-    for (var i = 0; i < 4; i++) { pool[i] = new Audio(); pool[i].preload = "auto"; }
+    for (var i = 0; i < 6; i++) { pool[i] = new Audio(); pool[i].preload = "auto"; }
     pool.forEach(function (a) { a.addEventListener("ended", function () { setOn(false);
       pool.forEach(function (x) { x.currentTime = 0; }); $("tfill").style.width = "0%"; $("tseek").value = 0; }); });
     $("tplay").addEventListener("click", function () { if (!pool[active].src) return;
