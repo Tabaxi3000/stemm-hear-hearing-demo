@@ -85,7 +85,7 @@ for aid, ag in AUDIOGRAMS.items():
     p = os.path.join(SC, f"omha_{aid}.png"); aud_png(ag, p)
     out["audiograms"].append(dict(id=aid, name=NAME[aid], png=png_b64(p),
         conditions=[dict(id=c, label=l, sub=s, cls=cl,
-                         sii=round(float(sp.audibility(raw[c], SR, ag)), 2),
+                         sii=round(float(sp.official_sii(raw[c], raw['original'], SR, ag)), 2),
                          file=write_aac(clips[c], f"omha_{aid}_{c}")) for c,l,s,cl in COND]))
     print(f"{aid}: rendered 5 conditions")
 

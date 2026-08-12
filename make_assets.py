@@ -155,7 +155,7 @@ for A in AUDIOGRAMS:
              for cid, lbl, _ in CONDITIONS]
     assets["audiograms"].append(dict(id=A["id"], name=A["name"], blurb=A["blurb"],
                                      png=png_b64(pth), comp=png_b64(cpth),
-                                     orig_sii=round(float(sp.audibility(x65, SR, A["ag"])), 2), conditions=conds))
+                                     orig_sii=round(float(sp.official_sii(x65, x65, SR, A["ag"])), 2), conditions=conds))
 
 json.dump(assets, open(os.path.join(SC, "assets.json"), "w"))
 print("wrote assets.json  %.3f MB (files in web/audio)" % (os.path.getsize(os.path.join(SC, "assets.json")) / 1e6))

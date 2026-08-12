@@ -52,7 +52,7 @@ def transport(cur_label):
 
 
 def sii_row(items):                                     # precomputed audibility per condition
-    return ('<div class="siirow"><b>Audibility (SII proxy, 0–1):</b> '
+    return ('<div class="siirow"><b>ANSI SII (0–1):</b> '
             + "  &middot;  ".join(f"{html.escape(n)} {v:.2f}" for n, v in items) + "</div>")
 
 
@@ -203,6 +203,13 @@ TOOL_CSS = """
 .quickstart{font-size:12.5px;color:var(--ink-2);background:color-mix(in srgb,var(--teal) 7%,transparent);
   border:1px solid var(--line);border-radius:10px;padding:11px 14px;margin:0 0 18px;line-height:1.5}
 .quickstart b{color:var(--ink)}
+.advanced{margin:8px 0 14px;border:1px solid var(--line);border-radius:10px;padding:0 12px;background:color-mix(in srgb,var(--teal) 3%,transparent)}
+.advanced>summary{cursor:pointer;font-size:11.5px;color:var(--ink-2);font-family:var(--mono);padding:11px 0;list-style:none;line-height:1.4}
+.advanced>summary::-webkit-details-marker{display:none}
+.advanced>summary:before{content:"\25B8  ";color:var(--teal)} .advanced[open]>summary:before{content:"\25BE  "}
+.advanced[open]{padding-bottom:8px}
+.advgrp{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);margin:14px 0 6px}
+.advgrp:first-of-type{margin-top:4px}
 .spec{display:block;width:100%;height:auto;margin-top:12px;background:var(--paper);border:1px solid var(--line);border-radius:8px}
 .blindstart{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink);background:transparent;border:1.5px solid var(--line);border-radius:9px;padding:8px 14px;cursor:pointer;margin-top:14px}
 .blindstart:hover:not(:disabled){border-color:var(--teal);color:var(--teal)} .blindstart:disabled{opacity:.45;cursor:default}
@@ -242,37 +249,43 @@ TOOL_HTML = f"""
             <button data-preset="notch">noise-notch</button></div>
           <div class="agwrap"><canvas id="agc" width="290" height="170"></canvas>
             <div class="sliders" id="sliders"></div></div>
-          <div class="rowctl"><label for="prog">Program</label>
-            <select id="prog"><option value="speech" selected>speech</option>
-            <option value="music">music (slow release)</option></select><span>music = wide dynamics</span></div>
-          <div class="rowctl"><label for="rel">WDRC release</label>
-            <input type="range" id="rel" min="20" max="600" step="10" value="150"><span id="relv">150 ms</span></div>
           <div class="rowctl"><label for="level">Input level</label>
             <select id="level"><option value="50">soft &middot; 50</option><option value="65" selected>normal &middot; 65</option>
             <option value="80">loud &middot; 80</option></select><span>dB SPL</span></div>
-          <div class="rowctl"><label for="flow">Frequency lowering</label>
-            <select id="flow"><option value="1" selected>off</option><option value="1.5">1.5&times;</option>
-            <option value="2">2&times;</option></select><span>for dead highs</span></div>
-          <div class="rowctl"><label for="levels">Levels</label>
-            <select id="levels"><option value="matched" selected>matched (fair A/B)</option>
-            <option value="real">real (aid is louder)</option></select></div>
-          <div class="rowctl"><label for="gap">Air&ndash;bone gap</label>
-            <input type="range" id="gap" min="0" max="40" step="5" value="0"><span id="gapv">0 dB</span></div>
-          <div class="rowctl"><label for="ohc">OHC health</label>
-            <input type="range" id="ohc" min="0" max="100" step="10" value="0"><span id="ohcv">0%</span></div>
-          <p class="ctlnote">Air&ndash;bone gap (conductive) and healthy outer hair cells both mean less
-            recruitment &rarr; the <b>Personalized</b> fit compresses less (more linear).</p>
-          <div class="rowctl"><label for="noise">Add noise</label>
-            <select id="noise"><option value="-1" selected>off</option><option value="10">+10 dB SNR</option>
-            <option value="5">+5 dB SNR</option><option value="0">0 dB SNR</option></select>
-            <select id="ntype"><option value="ssn" selected>speech-shaped</option><option value="babble">babble</option></select></div>
-          <div class="rowctl"><label for="rev">Reverberation</label>
-            <select id="rev"><option value="0" selected>off</option><option value="0.3">small room</option>
-            <option value="0.6">hall</option></select></div>
-          <label class="chk"><input type="checkbox" id="nr"> Noise reduction (aid-side denoiser)
-            <span class="chknote">&mdash; suppresses steady noise between words; hear it help vs the unaided noisy Original</span></label>
-          <label class="chk"><input type="checkbox" id="losssim"> Hear it as the patient does
-            <span class="chknote">&mdash; play the output through a simulation of the loss, so aided vs unaided shows the benefit</span></label>
+          <details class="advanced">
+            <summary>More options &mdash; program, noise &amp; reverb, bone/OHC, frequency lowering, "hear as the patient"</summary>
+            <p class="advgrp">Fitting</p>
+            <div class="rowctl"><label for="prog">Program</label>
+              <select id="prog"><option value="speech" selected>speech</option>
+              <option value="music">music (slow release)</option></select><span>music = wide dynamics</span></div>
+            <div class="rowctl"><label for="rel">WDRC release</label>
+              <input type="range" id="rel" min="20" max="600" step="10" value="150"><span id="relv">150 ms</span></div>
+            <div class="rowctl"><label for="flow">Frequency lowering</label>
+              <select id="flow"><option value="1" selected>off</option><option value="1.5">1.5&times;</option>
+              <option value="2">2&times;</option></select><span>for dead highs</span></div>
+            <div class="rowctl"><label for="gap">Air&ndash;bone gap</label>
+              <input type="range" id="gap" min="0" max="40" step="5" value="0"><span id="gapv">0 dB</span></div>
+            <div class="rowctl"><label for="ohc">OHC health</label>
+              <input type="range" id="ohc" min="0" max="100" step="10" value="0"><span id="ohcv">0%</span></div>
+            <p class="ctlnote">Air&ndash;bone gap (conductive) and healthy outer hair cells both mean less
+              recruitment &rarr; the <b>Personalized</b> fit compresses less (more linear).</p>
+            <p class="advgrp">Listening signal</p>
+            <div class="rowctl"><label for="noise">Add noise</label>
+              <select id="noise"><option value="-1" selected>off</option><option value="10">+10 dB SNR</option>
+              <option value="5">+5 dB SNR</option><option value="0">0 dB SNR</option></select>
+              <select id="ntype"><option value="ssn" selected>speech-shaped</option><option value="babble">babble</option></select></div>
+            <div class="rowctl"><label for="rev">Reverberation</label>
+              <select id="rev"><option value="0" selected>off</option><option value="0.3">small room</option>
+              <option value="0.6">hall</option></select></div>
+            <label class="chk"><input type="checkbox" id="nr"> Noise reduction (aid-side denoiser)
+              <span class="chknote">&mdash; suppresses steady noise between words</span></label>
+            <p class="advgrp">Play it as</p>
+            <div class="rowctl"><label for="levels">Levels</label>
+              <select id="levels"><option value="matched" selected>matched (fair A/B)</option>
+              <option value="real">real (aid is louder)</option></select></div>
+            <label class="chk"><input type="checkbox" id="losssim"> Hear it as the patient does
+              <span class="chknote">&mdash; through a simulation of the loss, so aided vs unaided shows the benefit</span></label>
+          </details>
           <button id="run" class="runbtn" disabled>Process</button>
           <span id="tstatus" class="status">pick an audio file to start</span>
           <div id="engine" class="engine">engine: real Python module (Pyodide) &mdash; boots on first use</div>
