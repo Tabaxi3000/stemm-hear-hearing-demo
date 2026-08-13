@@ -7,6 +7,7 @@
   var FREQS = [250, 500, 1000, 2000, 4000, 8000];
   var ag = [20, 25, 30, 40, 55, 65];                   // left ear (also the mono audiogram)
   var agR = ag.slice();                                // right ear (used only in binaural mode)
+  var binauralOn = false, binaEverOn = false;
   var SR = 32000, CAP = 10;                            // process up to 10 s (each fit is a full DSP pass)
   var input = null, fileName = "", urls = {}, clips = {};
   var KEYS = ["original", "static", "wdrc", "rx", "nal", "dsl", "cam", "per"], specCache = {};
@@ -35,9 +36,11 @@
     function row(lab, arr, fmt) {
       return '<div><b>' + lab + '</b> ' + L.map(function (n, i) { return n + " " + (arr && arr[i] != null ? fmt(arr[i]) : "–"); }).join("  ·  ") + '</div>';
     }
-    var h = row("ANSI SII (0–1):", si, function (v) { return v.toFixed(2); });
-    if (st) h += row("STOI (0–1):", st, function (v) { return v.toFixed(2); });
-    if (er) h += row("dB RMS to NAL target:", er, function (v) { return v.toFixed(0); });
+    var ear = binauralOn ? ", poorer ear" : "";
+    var h = row("ANSI SII (0–1" + ear + "):", si, function (v) { return v.toFixed(2); });
+    if (st) h += row("STOI (0–1" + ear + "):", st, function (v) { return v.toFixed(2); });
+    if (er) h += row("dB RMS to NAL target" + ear + ":", er, function (v) { return v.toFixed(0); });
+    h += '<div class="metleg">SII &amp; STOI: higher = better (more audible / intelligible) &middot; dB&#8209;to&#8209;target: closer to 0 = closer to the NAL&#8209;NL2 prescription</div>';
     el.innerHTML = h; el.style.display = "";
   }
   function ltas(a) {                                   // Welch long-term magnitude spectrum (dB) via DSP.fft
@@ -131,7 +134,19 @@
   function buildSliders() { buildSlidersOn("sliders", ag, "--teal"); buildSlidersOn("sliders2", agR, "--blue"); }
   function preset(name) {
     var P = { normal:[5,5,5,5,10,10], sloping:[20,25,30,40,55,65], flat:[40,42,45,45,48,50], ski:[15,20,30,50,70,80], cookie:[15,35,55,55,35,20], reverse:[60,55,45,30,25,25], notch:[10,15,25,55,30,20] };
-    ag = P[name].slice(); buildSliders(); drawAg();          // presets set the LEFT ear (right kept as the user has it)
+    ag = P[name].slice();
+    if (binauralOn) agR = P[name].slice();                   // two-ear mode: a preset seeds both ears symmetrically
+    buildSliders(); drawAg();
+  }
+  function setEarMode(two) {
+    binauralOn = two;
+    if (two && !binaEverOn) { agR = ag.slice(); binaEverOn = true; }   // start the right ear matched to the left
+    var w = $("agwrap2"); if (w) w.hidden = !two;
+    if ($("earlblL")) $("earlblL").textContent = two ? "left ear" : "audiogram";
+    if ($("earlblL")) $("earlblL").classList.toggle("earR", false);
+    if ($("earOne")) $("earOne").classList.toggle("on", !two);
+    if ($("earTwo")) $("earTwo").classList.toggle("on", two);
+    buildSliders(); drawAg();
   }
 
   // ---- Pyodide (real module) ---------------------------------------------------------
@@ -144,14 +159,15 @@
     return loadScript(U + "pyodide.js")
       .then(function () { return loadPyodide({ indexURL: U }); })
       .then(function (py) { pyodide = py; engine("engine: loading numpy / scipy…"); return py.loadPackage(["numpy", "scipy"]); })
-      .then(function () { return Promise.all(["./speech_resynth.py", "./fitting.py", "./sii.py", "./stoi_vendor.py"].map(function (u) { return fetch(u); })); })
+      .then(function () { return Promise.all(["./speech_resynth.py", "./fitting.py", "./sii.py", "./stoi_vendor.py", "./metrics.py"].map(function (u) { return fetch(u); })); })
       .then(function (rs) { if (rs.some(function (r) { return !r.ok; })) throw new Error("module fetch failed"); return Promise.all(rs.map(function (r) { return r.text(); })); })
       .then(function (srcs) {
         pyodide.FS.writeFile("speech_resynth.py", srcs[0]);
         pyodide.FS.writeFile("fitting.py", srcs[1]);
         pyodide.FS.writeFile("sii.py", srcs[2]);                        // vendored ANSI SII (Malcolm Slaney)
         pyodide.FS.writeFile("stoi_vendor.py", srcs[3]);               // vendored STOI (Taal et al.)
-        pyodide.runPython("import numpy as np\nimport speech_resynth as sp\nimport fitting\nimport sii\nimport stoi_vendor");
+        pyodide.FS.writeFile("metrics.py", srcs[4]);                   // shared SII/STOI/dB-to-target (same as gallery)
+        pyodide.runPython("import numpy as np\nimport speech_resynth as sp\nimport fitting\nimport sii\nimport stoi_vendor\nimport metrics");
         pyReady = true; pyBooting = false; engine("engine: exact — Python (numpy / scipy) + OpenMHA-style fittings");
       })
       .catch(function (e) { pyFailed = true; pyBooting = false;
@@ -174,36 +190,27 @@
     "xfit = xin2",                                                                // aid input
     "if nr:",                                                                     // noise reduction (aid-side)
     "    xfit = sp.denoise(xin2, sr); xfit = xfit / (np.sqrt(np.mean(xfit**2)) + 1e-12) * 10**((spl - 100) / 20)",
-    "mbf = np.asarray(sii.mid_band_freqs, float)",                                // 18 one-third-octave bands
-    "def _bl18(y):",
-    "    Y = np.abs(np.fft.rfft(y*np.hanning(len(y))))**2; ff = np.fft.rfftfreq(len(y), 1/sr)",
-    "    return np.array([10*np.log10(Y[(ff>=f0/2**(1/6))&(ff<f0*2**(1/6))].sum()+1e-12) for f0 in mbf])",
-    "tgt = np.asarray(fitting.prescribe('nal_nl2', ag, list(mbf), (65.0,)))[0]",  // NAL-NL2 target insertion gain
-    "bl_un = _bl18(xclean)",
     "pm = sp.PersonalizedGainMap(fc, audiogram=ag)",
     "GAINS = {'static': (pm, False), 'wdrc': (pm, True), 'rx': (sp.PrescriptiveGain(fc, ag), True),",
     "         'nal': (fitting.GainTableWDRC(fc, ag, 'nal_nl2'), True), 'dsl': (fitting.GainTableWDRC(fc, ag, 'dsl_mio'), True),",
     "         'cam': (fitting.GainTableWDRC(fc, ag, 'camfit'), True),",                                  // exact Cambridge/CAMFIT (CAM2)
     "         'per': (sp.PersonalizedWDRC(fc, audiogram=ag, airbone_gap=gap, ohc_health=ohc), True)}",   // bone/OHC-aware
     "rel_eff = 800.0 if prog == 'music' else float(rel)",                          // music program: slow release for wide dynamics
+    "ORDER = ['original','static','wdrc','rx','nal','dsl','cam','per']",
     "OUT = {'original': xin2.astype('float32')}",
-    "SII = {'original': round(sp.official_sii(xin2, xclean, sr, ag), 2)}",
-    "STOI = {'original': round(float(stoi_vendor.stoi(xclean, xin2, sr)), 2)}",
-    "ERR = {'original': round(float(np.sqrt(np.mean(((_bl18(xin2)-bl_un)-tgt)**2))), 1)}",
+    "MET = {'original': metrics.all_metrics(xin2, xclean, sr, ag)}",             // SII + STOI + dB-to-NAL-target
     "for _k,(_g,_dyn) in GAINS.items():",
     "    _r = sp.run(xfit, sr, gain=_g, attack_ms=(5 if _dyn else None), release_ms=(rel_eff if _dyn else None), **cm)",
     "    _y = _r['waveform']",
     "    OUT[_k] = _y.astype('float32')",
-    "    SII[_k] = round(sp.official_sii(_y, xclean, sr, ag), 2)",
-    "    STOI[_k] = round(float(stoi_vendor.stoi(xclean, _y, sr)), 2)",
-    "    ERR[_k] = round(float(np.sqrt(np.mean(((_bl18(_y)-bl_un)-tgt)**2))), 1)",   // dB RMS vs NAL target
+    "    MET[_k] = metrics.all_metrics(_y, xclean, sr, ag)",
     "if losssim:",                                                               // 'hear it as the patient does'
     "    LS = sp.HearingLossSim(fc, ag)",
     "    for _k in list(OUT): OUT[_k] = sp.run(np.asarray(OUT[_k], dtype=float), sr, gain=LS, **cm)['waveform'].astype('float32')",
     "yo=OUT['original']; ys=OUT['static']; yw=OUT['wdrc']; yr=OUT['rx']; yn=OUT['nal']; yd=OUT['dsl']; yc=OUT['cam']; yp=OUT['per']",
-    "si=[SII[k] for k in ['original','static','wdrc','rx','nal','dsl','cam','per']]",
-    "st=[STOI[k] for k in ['original','static','wdrc','rx','nal','dsl','cam','per']]",
-    "er=[ERR[k] for k in ['original','static','wdrc','rx','nal','dsl','cam','per']]"
+    "si=[MET[k]['sii'] for k in ORDER]",
+    "st=[MET[k]['stoi'] for k in ORDER]",
+    "er=[MET[k]['err'] for k in ORDER]"
   ].join("\n");
 
   function opts() {
@@ -214,7 +221,7 @@
              noise: $("noise") ? +$("noise").value : -1, nr: !!($("nr") && $("nr").checked),
              prog: $("prog") ? $("prog").value : "speech",
              ntype: $("ntype") ? $("ntype").value : "ssn", rev: $("rev") ? +$("rev").value : 0,
-             binaural: !!($("binaural") && $("binaural").checked) };
+             binaural: binauralOn };
   }
   function runEngine(agVals) {                            // agVals: audiogram to fit (one ear); defaults to left
     var o = opts(); agVals = agVals || ag;
@@ -382,11 +389,10 @@
     if ($("ohc")) $("ohc").addEventListener("input", function () { $("ohcv").textContent = $("ohc").value + "%"; });
     document.querySelectorAll("[data-preset]").forEach(function (b) {
       b.addEventListener("click", function () { preset(b.dataset.preset); }); });
-    if ($("binaural")) $("binaural").addEventListener("change", function () {
-      var on = $("binaural").checked; var w = $("agwrap2"); if (w) w.hidden = !on;
-      if (on) { buildSliders(); drawAg(); } });
-    if ($("copyLR")) $("copyLR").addEventListener("click", function () {
-      agR = ag.slice(); buildSliders(); drawAg(); });
+    if ($("earOne")) $("earOne").addEventListener("click", function () { setEarMode(false); });
+    if ($("earTwo")) $("earTwo").addEventListener("click", function () { setEarMode(true); });
+    if ($("copyLR")) $("copyLR").addEventListener("click", function () { agR = ag.slice(); buildSliders(); drawAg(); });
+    if ($("copyRL")) $("copyRL").addEventListener("click", function () { ag = agR.slice(); buildSliders(); drawAg(); });
     $("run").addEventListener("click", process);
     for (var i = 0; i < KEYS.length; i++) { pool[i] = new Audio(); pool[i].preload = "auto"; }
     blind.ba = new Audio(); blind.bb = new Audio();

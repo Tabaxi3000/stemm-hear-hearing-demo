@@ -10,7 +10,9 @@ import matplotlib.pyplot as plt
 
 SC = "/private/tmp/claude-502/-Users-tabaxitft-Desktop-STEMM-HEAR/02cdbe4e-d460-4375-a16a-683a6e731aea/scratchpad"
 sys.path.insert(0, "/Users/tabaxitft/Desktop/STEMM-HEAR/FILTER BANKS/speech_resynthesis/colab")
+sys.path.append("/Users/tabaxitft/Desktop/STEMM-HEAR/FILTER BANKS/speech_resynthesis/web")   # metrics
 import speech_resynth as sp
+import metrics
 SR = 32000                                     # 32 kHz -> 12 kHz filter bank
 FLO, FHI, NB = 100.0, 12000.0, 32
 FC = sp.band_centres(sp.band_edges(FLO, FHI, NB, "greenwood"))
@@ -113,7 +115,9 @@ for sub in SUBJECTS:
         id=sub["id"], name=sub["name"], kind=sub["kind"], blurb=sub["blurb"],
         placeholder=(sub["src"]=="music"), ild_db=round(float(ild),1),
         png=png_b64(agp), io=png_b64(iop),
-        conditions=[dict(id=c, label=l, sub=s, cls=cl, file=write_aac(a, f"subj_{sub['id']}_{c}")) for c,l,s,cl,a in conds]))
+        conditions=[dict(id=c, label=l, sub=s, cls=cl, file=write_aac(a, f"subj_{sub['id']}_{c}"),
+                         **{k: metrics.poorer_ear_metrics(a, x65, SR, sub["aL"], sub["aR"])[k] for k in ("sii","stoi","err")})
+                    for c,l,s,cl,a in conds]))
     print(f"{sub['name']:12s} rendered | aided R-L level diff {ild:+.1f} dB")
 
 # ---- ILD / localization demo: a panned talker, independent vs linked compression -----

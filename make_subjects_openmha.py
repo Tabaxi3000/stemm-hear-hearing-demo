@@ -13,7 +13,8 @@ SC = "/private/tmp/claude-502/-Users-tabaxitft-Desktop-STEMM-HEAR/02cdbe4e-d460-
 PROJ = "/Users/tabaxitft/Desktop/STEMM-HEAR/FILTER BANKS/speech_resynthesis"
 OMHA = os.path.join(PROJ, "openmha", "out")
 sys.path.insert(0, os.path.join(PROJ, "colab")); sys.path.insert(0, os.path.join(PROJ, "openmha"))
-import speech_resynth as sp, fitting
+sys.path.append(os.path.join(PROJ, "web"))
+import speech_resynth as sp, fitting, metrics
 SR = 16000
 FC = sp.band_centres(sp.band_edges(100.0, 7200.0, 28, "greenwood"))
 COMMON = dict(backend="stft", n_bands=28, flo=100.0, fhi=7200.0, carrier="original",
@@ -89,8 +90,9 @@ for sub in SUBJECTS:
     p = os.path.join(SC, f"subomha_{sub['id']}.png"); twoear_png(sub, p)
     conds = []
     for cid, lab, s, cl in COND:
+        pm = metrics.poorer_ear_metrics(stereo[cid], x65, SR, sub["aL"], sub["aR"])
         conds.append(dict(id=cid, label=lab, sub=s, cls=cl,
-                          sii=poorer_ear_sii(stereo[cid], x65, sub),
+                          sii=pm["sii"], stoi=pm["stoi"], err=pm["err"],
                           file=write_aac(clips[cid], f"subomha_{sub['id']}_{cid}")))
     out["subjects"].append(dict(id=sub["id"], name=sub["name"], kind=sub["kind"],
                                 placeholder=(sub["src"]=="music"), png=png_b64(p), conditions=conds))

@@ -10,7 +10,9 @@ import matplotlib.pyplot as plt
 
 SC = "/private/tmp/claude-502/-Users-tabaxitft-Desktop-STEMM-HEAR/02cdbe4e-d460-4375-a16a-683a6e731aea/scratchpad"
 sys.path.insert(0, "/Users/tabaxitft/Desktop/STEMM-HEAR/FILTER BANKS/speech_resynthesis/colab")
+sys.path.append("/Users/tabaxitft/Desktop/STEMM-HEAR/FILTER BANKS/speech_resynthesis/web")   # metrics / stoi_vendor
 import speech_resynth as sp
+import metrics
 
 SR = 32000                                     # 32 kHz -> 12 kHz filter bank (Nyquist 16 kHz)
 
@@ -150,12 +152,12 @@ assets = {"original_file": write_aac(clips["original"], "shape_original"), "audi
 for A in AUDIOGRAMS:
     pth = os.path.join(SC, f"ag_{A['id']}.png"); audiogram_png(A["ag"], pth)
     cpth = os.path.join(SC, f"comp_{A['id']}.png"); comp_png(A["ag"], cpth)
-    conds = [{"id": cid, "label": lbl, "sii": round(float(sp.audibility(raw[f"{A['id']}__{cid}"], SR, A["ag"])), 2),
-              "file": write_aac(clips[f"{A['id']}__{cid}"], f"shape_{A['id']}_{cid}")}
+    conds = [dict(id=cid, label=lbl, file=write_aac(clips[f"{A['id']}__{cid}"], f"shape_{A['id']}_{cid}"),
+                  **metrics.all_metrics(raw[f"{A['id']}__{cid}"], x65, SR, A["ag"]))
              for cid, lbl, _ in CONDITIONS]
     assets["audiograms"].append(dict(id=A["id"], name=A["name"], blurb=A["blurb"],
                                      png=png_b64(pth), comp=png_b64(cpth),
-                                     orig_sii=round(float(sp.official_sii(x65, x65, SR, A["ag"])), 2), conditions=conds))
+                                     orig=metrics.all_metrics(x65, x65, SR, A["ag"]), conditions=conds))
 
 json.dump(assets, open(os.path.join(SC, "assets.json"), "w"))
 print("wrote assets.json  %.3f MB (files in web/audio)" % (os.path.getsize(os.path.join(SC, "assets.json")) / 1e6))

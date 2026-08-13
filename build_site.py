@@ -52,9 +52,18 @@ def transport(cur_label):
       <p class="cue"><span class="dot"></span><b class="cur">{cur_label}</b><span class="hint">{{hint}}</span></p>"""
 
 
-def sii_row(items):                                     # precomputed audibility per condition
-    return ('<div class="siirow"><b>ANSI SII (0–1):</b> '
-            + "  &middot;  ".join(f"{html.escape(n)} {v:.2f}" for n, v in items) + "</div>")
+def metric_rows(items, sii_label="ANSI SII (0–1)"):     # items: [(name, {sii, stoi, err}), ...]
+    def row(lab, key, fmt):
+        cells = "  &middot;  ".join(
+            (f"{html.escape(n)} {fmt(m[key])}" if m.get(key) is not None else f"{html.escape(n)} –")
+            for n, m in items)
+        return f"<div><b>{lab}:</b> {cells}</div>"
+    return ('<div class="siirow">'
+            + row(sii_label, "sii", lambda v: f"{v:.2f}")
+            + row("STOI (0–1)", "stoi", lambda v: f"{v:.2f}")
+            + row("dB RMS to NAL target", "err", lambda v: f"{v:.0f}")
+            + '<div class="metleg">SII &amp; STOI: higher = better &middot; dB&#8209;to&#8209;target: closer to 0 = closer to the NAL&#8209;NL2 prescription</div>'
+            + '</div>')
 
 
 def shape_section(n, s):
@@ -67,7 +76,7 @@ def shape_section(n, s):
         unit = '<span class="u">ms</span>' if c["id"].startswith("wdrc_") else ""
         chips.append(f'<button class="chip c-{cls}" data-i="{i}" aria-pressed="false">{lab}{unit}<em>{sub}</em></button>')
     hint = "&mdash; switch while it plays; position holds, so you A/B the same instant"
-    srow = sii_row([("Original", s["orig_sii"])] + [(COND[c["id"]][0], c["sii"]) for c in s["conditions"]])
+    srow = metric_rows([("Original", s["orig"])] + [(COND[c["id"]][0], c) for c in s["conditions"]])
     return f"""
     <section class="specimen" id="st-{sid}" data-player>
       <div class="sp-head"><span class="sp-num">{n:02d}</span>
@@ -113,6 +122,9 @@ def subject_section(s):
     else:                                                 # single wide figure (e.g. the ILD bar chart)
         charts = (f'<figure class="paper wide"><img alt="{html.escape(s["name"])}" '
                   f'src="data:image/png;base64,{s["png"]}"><figcaption>{s.get("figcap","")}</figcaption></figure>')
+    srow = ""
+    if s["conditions"] and "sii" in s["conditions"][0]:   # binaural subjects carry poorer-ear metrics
+        srow = metric_rows([(c["label"], c) for c in s["conditions"]], "ANSI SII, poorer ear (0–1)")
     return f"""
     <section class="specimen subject" id="st-{s['id']}" data-player>
       <div class="sp-head"><span class="sp-num sub">&#9670;</span>
@@ -121,7 +133,8 @@ def subject_section(s):
       {charts}
       <div class="console"><div class="chips">{chips[0]}<span class="sep"></span>
         <span class="ramp">{''.join(chips[1:])}</span></div>
-        {transport('Original').format(hint=hint)}</div>
+        {transport('Original').format(hint=hint)}
+        {srow}</div>
       <div class="audio-pool" hidden>{''.join(audios)}</div>
     </section>"""
 
@@ -134,7 +147,7 @@ def openmha_section(a):                                  # ours (Rx) vs OpenMHA 
         chips.append(f'<button class="chip c-{c["cls"]}" data-i="{i}" aria-pressed="{pressed}">'
                      f'{html.escape(c["label"])}<em>{html.escape(c["sub"])}</em></button>')
     hint = "&mdash; loudness-matched; compare our fit to the clinical prescriptions"
-    srow = sii_row([(c["label"], c["sii"]) for c in a["conditions"]])
+    srow = metric_rows([(c["label"], c) for c in a["conditions"]])
     return f"""
     <section class="specimen" id="st-omha-{a['id']}" data-player>
       <div class="sp-head"><span class="sp-num sub">&#9670;</span>
@@ -160,8 +173,7 @@ def subj_omha_section(a):                               # binaural subject: ours
                      f'{html.escape(c["label"])}<em>{html.escape(c["sub"])}</em></button>')
     ph = ' <span class="badge">placeholder music</span>' if a.get("placeholder") else ""
     hint = "&mdash; headphones: each ear is fit on its own audiogram; loudness-matched"
-    srow = sii_row([(c["label"], c["sii"]) for c in a["conditions"]]).replace(
-        "ANSI SII (0–1):", "ANSI SII, poorer ear (0–1):")
+    srow = metric_rows([(c["label"], c) for c in a["conditions"]], "ANSI SII, poorer ear (0–1)")
     return f"""
     <section class="specimen subject" id="st-somha-{a['id']}" data-player>
       <div class="sp-head"><span class="sp-num sub">&#9670;</span>
@@ -222,6 +234,7 @@ TOOL_CSS = """
 .chk input{margin-top:2px;accent-color:var(--teal)} .chknote{color:var(--muted);font-size:11.5px}
 .siirow{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:12px;padding-top:10px;
   border-top:1px dashed var(--line);line-height:1.7} .siirow b{color:var(--ink)}
+.metleg{font-size:10.5px;color:var(--muted);opacity:.85;margin-top:7px;line-height:1.5;border-top:none;padding-top:0}
 .runbtn{font-family:var(--mono);font-weight:600;font-size:14px;color:#fff;background:var(--teal);border:none;
   border-radius:10px;padding:10px 22px;cursor:pointer;transition:transform .06s}
 .runbtn:hover{transform:translateY(-1px)} .runbtn:disabled{opacity:.45;cursor:default;transform:none}
@@ -241,9 +254,17 @@ TOOL_CSS = """
 .advanced[open]{padding-bottom:8px}
 .advgrp{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);margin:14px 0 6px}
 .advgrp:first-of-type{margin-top:4px}
-.ear2{margin:8px 0 4px}
-.earlbl{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--blue);margin-bottom:3px}
-.minibtn{margin-top:6px;font-family:var(--mono);font-size:10.5px;padding:4px 9px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink-2);cursor:pointer}
+.earmode{display:flex;align-items:center;gap:8px;margin:10px 0 6px;flex-wrap:wrap}
+.earmode-lbl{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.segbtn{font-family:var(--mono);font-size:11px;padding:5px 11px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink-2);cursor:pointer}
+.segbtn:hover{border-color:var(--teal-3)}
+.segbtn.on{background:var(--teal);border-color:var(--teal);color:#fff}
+.ears{display:flex;flex-wrap:wrap;gap:16px}
+.agcol{display:flex;flex-direction:column}
+.earlbl{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--teal);margin-bottom:4px}
+.earlbl.earR{color:var(--blue)}
+.minirow{display:flex;gap:6px;margin-top:6px}
+.minibtn{font-family:var(--mono);font-size:10.5px;padding:4px 9px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink-2);cursor:pointer}
 .minibtn:hover{border-color:var(--teal);color:var(--teal)}
 .spec{display:block;width:100%;height:auto;margin-top:12px;background:var(--paper);border:1px solid var(--line);border-radius:8px}
 .blindstart{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink);background:transparent;border:1.5px solid var(--line);border-radius:9px;padding:8px 14px;cursor:pointer;margin-top:14px}
@@ -279,26 +300,32 @@ TOOL_HTML = f"""
         <div class="panel">
           <label class="filebtn">Choose audio<input type="file" id="tf" accept="audio/*"></label>
           <span id="fname" class="fname">no file chosen yet</span>
-          <div class="presets">audiogram:
+          <div class="presets">audiogram preset:
             <button data-preset="normal">normal</button><button data-preset="sloping">sloping</button>
             <button data-preset="flat">flat 40</button><button data-preset="ski">ski-slope</button>
             <button data-preset="cookie">cookie-bite</button><button data-preset="reverse">reverse</button>
             <button data-preset="notch">noise-notch</button></div>
-          <div class="agwrap"><canvas id="agc" width="290" height="170"></canvas>
-            <div class="sliders" id="sliders"></div></div>
+          <div class="earmode"><span class="earmode-lbl">ears:</span>
+            <button type="button" id="earOne" class="segbtn on">one &mdash; same both sides</button>
+            <button type="button" id="earTwo" class="segbtn">two &mdash; left / right</button></div>
+          <div class="ears">
+            <div class="agwrap" id="agwrapL">
+              <div class="agcol"><span class="earlbl" id="earlblL">audiogram</span>
+                <canvas id="agc" width="290" height="170"></canvas></div>
+              <div class="sliders" id="sliders"></div></div>
+            <div class="agwrap ear2" id="agwrap2" hidden>
+              <div class="agcol"><span class="earlbl earR">right ear</span>
+                <canvas id="agc2" width="290" height="170"></canvas>
+                <div class="minirow"><button id="copyLR" type="button" class="minibtn">copy L &rarr; R</button>
+                  <button id="copyRL" type="button" class="minibtn">copy R &rarr; L</button></div></div>
+              <div class="sliders" id="sliders2"></div></div>
+          </div>
           <div class="rowctl"><label for="level">Input level</label>
             <select id="level"><option value="50">soft &middot; 50</option><option value="65" selected>normal &middot; 65</option>
             <option value="80">loud &middot; 80</option></select><span>dB SPL</span></div>
           <details class="advanced">
             <summary>More options &mdash; program, noise &amp; reverb, bone/OHC, frequency lowering, "hear as the patient"</summary>
             <p class="advgrp">Fitting</p>
-            <label class="chk"><input type="checkbox" id="binaural"> Two ears (binaural)
-              <span class="chknote">&mdash; set a different right-ear audiogram; every fit runs per ear and the output is stereo</span></label>
-            <div class="agwrap ear2" id="agwrap2" hidden>
-              <div><span class="earlbl">right ear</span>
-                <canvas id="agc2" width="290" height="170"></canvas>
-                <button id="copyLR" type="button" class="minibtn">copy left &rarr; right</button></div>
-              <div class="sliders" id="sliders2"></div></div>
             <div class="rowctl"><label for="prog">Program</label>
               <select id="prog"><option value="speech" selected>speech</option>
               <option value="music">music (slow release)</option></select><span>music = wide dynamics</span></div>

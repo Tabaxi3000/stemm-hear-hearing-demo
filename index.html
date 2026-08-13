@@ -152,6 +152,7 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
 .chk input{margin-top:2px;accent-color:var(--teal)} .chknote{color:var(--muted);font-size:11.5px}
 .siirow{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:12px;padding-top:10px;
   border-top:1px dashed var(--line);line-height:1.7} .siirow b{color:var(--ink)}
+.metleg{font-size:10.5px;color:var(--muted);opacity:.85;margin-top:7px;line-height:1.5;border-top:none;padding-top:0}
 .runbtn{font-family:var(--mono);font-weight:600;font-size:14px;color:#fff;background:var(--teal);border:none;
   border-radius:10px;padding:10px 22px;cursor:pointer;transition:transform .06s}
 .runbtn:hover{transform:translateY(-1px)} .runbtn:disabled{opacity:.45;cursor:default;transform:none}
@@ -171,9 +172,17 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
 .advanced[open]{padding-bottom:8px}
 .advgrp{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);margin:14px 0 6px}
 .advgrp:first-of-type{margin-top:4px}
-.ear2{margin:8px 0 4px}
-.earlbl{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--blue);margin-bottom:3px}
-.minibtn{margin-top:6px;font-family:var(--mono);font-size:10.5px;padding:4px 9px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink-2);cursor:pointer}
+.earmode{display:flex;align-items:center;gap:8px;margin:10px 0 6px;flex-wrap:wrap}
+.earmode-lbl{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.segbtn{font-family:var(--mono);font-size:11px;padding:5px 11px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink-2);cursor:pointer}
+.segbtn:hover{border-color:var(--teal-3)}
+.segbtn.on{background:var(--teal);border-color:var(--teal);color:#fff}
+.ears{display:flex;flex-wrap:wrap;gap:16px}
+.agcol{display:flex;flex-direction:column}
+.earlbl{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--teal);margin-bottom:4px}
+.earlbl.earR{color:var(--blue)}
+.minirow{display:flex;gap:6px;margin-top:6px}
+.minibtn{font-family:var(--mono);font-size:10.5px;padding:4px 9px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink-2);cursor:pointer}
 .minibtn:hover{border-color:var(--teal);color:var(--teal)}
 .spec{display:block;width:100%;height:auto;margin-top:12px;background:var(--paper);border:1px solid var(--line);border-radius:8px}
 .blindstart{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink);background:transparent;border:1.5px solid var(--line);border-radius:9px;padding:8px 14px;cursor:pointer;margin-top:14px}
@@ -249,7 +258,8 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
           min="0" max="1000" value="0" aria-label="Seek"></div>
         <span class="time"><b>0:00</b> / <span>0:20</span></span>
       </div>
-      <p class="cue"><span class="dot"></span><b class="cur">Original</b><span class="hint">&mdash; headphones: the two ears differ</span></p></div>
+      <p class="cue"><span class="dot"></span><b class="cur">Original</b><span class="hint">&mdash; headphones: the two ears differ</span></p>
+        <div class="siirow"><div><b>ANSI SII, poorer ear (0–1):</b> Original 0.15  &middot;  Left-ear fit 0.23  &middot;  Right-ear fit 0.35  &middot;  Binaural 0.43</div><div><b>STOI (0–1):</b> Original 1.00  &middot;  Left-ear fit 0.99  &middot;  Right-ear fit 0.92  &middot;  Binaural 0.92</div><div><b>dB RMS to NAL target:</b> Original 13  &middot;  Left-ear fit 11  &middot;  Right-ear fit 13  &middot;  Binaural 5</div><div class="metleg">SII &amp; STOI: higher = better &middot; dB&#8209;to&#8209;target: closer to 0 = closer to the NAL&#8209;NL2 prescription</div></div></div>
       <div class="audio-pool" hidden><audio data-i="0" preload="none" src="audio/subj_speech_a_original.m4a"></audio><audio data-i="1" preload="none" src="audio/subj_speech_a_left.m4a"></audio><audio data-i="2" preload="none" src="audio/subj_speech_a_right.m4a"></audio><audio data-i="3" preload="none" src="audio/subj_speech_a_binaural.m4a"></audio></div>
     </section>
 
@@ -266,7 +276,8 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
           min="0" max="1000" value="0" aria-label="Seek"></div>
         <span class="time"><b>0:00</b> / <span>0:20</span></span>
       </div>
-      <p class="cue"><span class="dot"></span><b class="cur">Original</b><span class="hint">&mdash; headphones: the two ears differ</span></p></div>
+      <p class="cue"><span class="dot"></span><b class="cur">Original</b><span class="hint">&mdash; headphones: the two ears differ</span></p>
+        <div class="siirow"><div><b>ANSI SII, poorer ear (0–1):</b> Original 0.73  &middot;  Left-ear fit 0.79  &middot;  Right-ear fit 0.82  &middot;  Binaural 0.82</div><div><b>STOI (0–1):</b> Original 1.00  &middot;  Left-ear fit 0.97  &middot;  Right-ear fit 0.97  &middot;  Binaural 0.97</div><div><b>dB RMS to NAL target:</b> Original 8  &middot;  Left-ear fit 6  &middot;  Right-ear fit 6  &middot;  Binaural 6</div><div class="metleg">SII &amp; STOI: higher = better &middot; dB&#8209;to&#8209;target: closer to 0 = closer to the NAL&#8209;NL2 prescription</div></div></div>
       <div class="audio-pool" hidden><audio data-i="0" preload="none" src="audio/subj_musician_a_original.m4a"></audio><audio data-i="1" preload="none" src="audio/subj_musician_a_left.m4a"></audio><audio data-i="2" preload="none" src="audio/subj_musician_a_right.m4a"></audio><audio data-i="3" preload="none" src="audio/subj_musician_a_binaural.m4a"></audio></div>
     </section>
     <p class="band-label">Binaural &mdash; keeping localization (ILD)</p>
@@ -284,7 +295,8 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
           min="0" max="1000" value="0" aria-label="Seek"></div>
         <span class="time"><b>0:00</b> / <span>0:20</span></span>
       </div>
-      <p class="cue"><span class="dot"></span><b class="cur">Original</b><span class="hint">&mdash; headphones: the two ears differ</span></p></div>
+      <p class="cue"><span class="dot"></span><b class="cur">Original</b><span class="hint">&mdash; headphones: the two ears differ</span></p>
+        </div>
       <div class="audio-pool" hidden><audio data-i="0" preload="none" src="audio/ild_source.m4a"></audio><audio data-i="1" preload="none" src="audio/ild_indep.m4a"></audio><audio data-i="2" preload="none" src="audio/ild_linked.m4a"></audio></div>
     </section>
     <p class="band-label">Textbook shapes &mdash; static vs WDRC, release swept</p>
@@ -308,7 +320,7 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
         <span class="time"><b>0:00</b> / <span>0:20</span></span>
       </div>
       <p class="cue"><span class="dot"></span><b class="cur">Original</b><span class="hint">&mdash; switch while it plays; position holds, so you A/B the same instant</span></p>
-        <div class="siirow"><b>ANSI SII (0–1):</b> Original 0.49  &middot;  STATIC 0.79  &middot;  60 0.73  &middot;  150 0.64  &middot;  400 0.51  &middot;  Rx 0.47</div></div>
+        <div class="siirow"><div><b>ANSI SII (0–1):</b> Original 0.49  &middot;  STATIC 0.86  &middot;  60 0.83  &middot;  150 0.78  &middot;  400 0.69  &middot;  Rx 0.65</div><div><b>STOI (0–1):</b> Original 1.00  &middot;  STATIC 0.99  &middot;  60 0.96  &middot;  150 0.96  &middot;  400 0.97  &middot;  Rx 0.97</div><div><b>dB RMS to NAL target:</b> Original 14  &middot;  STATIC 8  &middot;  60 6  &middot;  150 4  &middot;  400 5  &middot;  Rx 8</div><div class="metleg">SII &amp; STOI: higher = better &middot; dB&#8209;to&#8209;target: closer to 0 = closer to the NAL&#8209;NL2 prescription</div></div></div>
       <div class="audio-pool" hidden><audio data-i="0" preload="none" src="audio/shape_original.m4a"></audio><audio data-i="1" preload="none" src="audio/shape_sloping_static.m4a"></audio><audio data-i="2" preload="none" src="audio/shape_sloping_wdrc_fast.m4a"></audio><audio data-i="3" preload="none" src="audio/shape_sloping_wdrc_med.m4a"></audio><audio data-i="4" preload="none" src="audio/shape_sloping_wdrc_slow.m4a"></audio><audio data-i="5" preload="none" src="audio/shape_sloping_prescriptive.m4a"></audio></div>
     </section>
 
@@ -331,7 +343,7 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
         <span class="time"><b>0:00</b> / <span>0:20</span></span>
       </div>
       <p class="cue"><span class="dot"></span><b class="cur">Original</b><span class="hint">&mdash; switch while it plays; position holds, so you A/B the same instant</span></p>
-        <div class="siirow"><b>ANSI SII (0–1):</b> Original 0.24  &middot;  STATIC 0.78  &middot;  60 0.70  &middot;  150 0.60  &middot;  400 0.44  &middot;  Rx 0.37</div></div>
+        <div class="siirow"><div><b>ANSI SII (0–1):</b> Original 0.24  &middot;  STATIC 0.84  &middot;  60 0.79  &middot;  150 0.72  &middot;  400 0.60  &middot;  Rx 0.53</div><div><b>STOI (0–1):</b> Original 1.00  &middot;  STATIC 0.98  &middot;  60 0.95  &middot;  150 0.93  &middot;  400 0.93  &middot;  Rx 0.95</div><div><b>dB RMS to NAL target:</b> Original 16  &middot;  STATIC 9  &middot;  60 8  &middot;  150 7  &middot;  400 8  &middot;  Rx 10</div><div class="metleg">SII &amp; STOI: higher = better &middot; dB&#8209;to&#8209;target: closer to 0 = closer to the NAL&#8209;NL2 prescription</div></div></div>
       <div class="audio-pool" hidden><audio data-i="0" preload="none" src="audio/shape_original.m4a"></audio><audio data-i="1" preload="none" src="audio/shape_flat_static.m4a"></audio><audio data-i="2" preload="none" src="audio/shape_flat_wdrc_fast.m4a"></audio><audio data-i="3" preload="none" src="audio/shape_flat_wdrc_med.m4a"></audio><audio data-i="4" preload="none" src="audio/shape_flat_wdrc_slow.m4a"></audio><audio data-i="5" preload="none" src="audio/shape_flat_prescriptive.m4a"></audio></div>
     </section>
 
@@ -354,7 +366,7 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
         <span class="time"><b>0:00</b> / <span>0:20</span></span>
       </div>
       <p class="cue"><span class="dot"></span><b class="cur">Original</b><span class="hint">&mdash; switch while it plays; position holds, so you A/B the same instant</span></p>
-        <div class="siirow"><b>ANSI SII (0–1):</b> Original 0.42  &middot;  STATIC 0.70  &middot;  60 0.64  &middot;  150 0.55  &middot;  400 0.44  &middot;  Rx 0.41</div></div>
+        <div class="siirow"><div><b>ANSI SII (0–1):</b> Original 0.42  &middot;  STATIC 0.79  &middot;  60 0.75  &middot;  150 0.70  &middot;  400 0.61  &middot;  Rx 0.56</div><div><b>STOI (0–1):</b> Original 1.00  &middot;  STATIC 0.99  &middot;  60 0.96  &middot;  150 0.96  &middot;  400 0.96  &middot;  Rx 0.97</div><div><b>dB RMS to NAL target:</b> Original 17  &middot;  STATIC 9  &middot;  60 7  &middot;  150 5  &middot;  400 4  &middot;  Rx 7</div><div class="metleg">SII &amp; STOI: higher = better &middot; dB&#8209;to&#8209;target: closer to 0 = closer to the NAL&#8209;NL2 prescription</div></div></div>
       <div class="audio-pool" hidden><audio data-i="0" preload="none" src="audio/shape_original.m4a"></audio><audio data-i="1" preload="none" src="audio/shape_skislope_static.m4a"></audio><audio data-i="2" preload="none" src="audio/shape_skislope_wdrc_fast.m4a"></audio><audio data-i="3" preload="none" src="audio/shape_skislope_wdrc_med.m4a"></audio><audio data-i="4" preload="none" src="audio/shape_skislope_wdrc_slow.m4a"></audio><audio data-i="5" preload="none" src="audio/shape_skislope_prescriptive.m4a"></audio></div>
     </section>
     <p class="band-label">Ours vs OpenMHA &mdash; real clinical prescriptions</p>
@@ -375,7 +387,7 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
         <span class="time"><b>0:00</b> / <span>0:20</span></span>
       </div>
       <p class="cue"><span class="dot"></span><b class="cur">Original</b><span class="hint">&mdash; loudness-matched; compare our fit to the clinical prescriptions</span></p>
-        <div class="siirow"><b>ANSI SII (0–1):</b> Original 0.49  &middot;  Ours (Rx) 0.64  &middot;  NAL-NL2 0.84  &middot;  DSL m[i/o] 0.86  &middot;  CAMFIT 0.83</div></div>
+        <div class="siirow"><div><b>ANSI SII (0–1):</b> Original 0.49  &middot;  Ours (Rx) 0.64  &middot;  NAL-NL2 0.84  &middot;  DSL m[i/o] 0.86  &middot;  CAMFIT 0.83</div><div><b>STOI (0–1):</b> Original 1.00  &middot;  Ours (Rx) 0.98  &middot;  NAL-NL2 0.69  &middot;  DSL m[i/o] 0.69  &middot;  CAMFIT 0.68</div><div><b>dB RMS to NAL target:</b> Original 14  &middot;  Ours (Rx) 8  &middot;  NAL-NL2 5  &middot;  DSL m[i/o] 12  &middot;  CAMFIT 3</div><div class="metleg">SII &amp; STOI: higher = better &middot; dB&#8209;to&#8209;target: closer to 0 = closer to the NAL&#8209;NL2 prescription</div></div></div>
       <div class="audio-pool" hidden><audio data-i="0" preload="none" src="audio/omha_sloping_original.m4a"></audio><audio data-i="1" preload="none" src="audio/omha_sloping_ours.m4a"></audio><audio data-i="2" preload="none" src="audio/omha_sloping_nal_nl2.m4a"></audio><audio data-i="3" preload="none" src="audio/omha_sloping_dsl_mio.m4a"></audio><audio data-i="4" preload="none" src="audio/omha_sloping_camfit.m4a"></audio></div>
     </section>
 
@@ -395,7 +407,7 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
         <span class="time"><b>0:00</b> / <span>0:20</span></span>
       </div>
       <p class="cue"><span class="dot"></span><b class="cur">Original</b><span class="hint">&mdash; loudness-matched; compare our fit to the clinical prescriptions</span></p>
-        <div class="siirow"><b>ANSI SII (0–1):</b> Original 0.24  &middot;  Ours (Rx) 0.52  &middot;  NAL-NL2 0.83  &middot;  DSL m[i/o] 0.85  &middot;  CAMFIT 0.78</div></div>
+        <div class="siirow"><div><b>ANSI SII (0–1):</b> Original 0.24  &middot;  Ours (Rx) 0.52  &middot;  NAL-NL2 0.83  &middot;  DSL m[i/o] 0.85  &middot;  CAMFIT 0.78</div><div><b>STOI (0–1):</b> Original 1.00  &middot;  Ours (Rx) 0.96  &middot;  NAL-NL2 0.69  &middot;  DSL m[i/o] 0.69  &middot;  CAMFIT 0.69</div><div><b>dB RMS to NAL target:</b> Original 16  &middot;  Ours (Rx) 10  &middot;  NAL-NL2 5  &middot;  DSL m[i/o] 13  &middot;  CAMFIT 3</div><div class="metleg">SII &amp; STOI: higher = better &middot; dB&#8209;to&#8209;target: closer to 0 = closer to the NAL&#8209;NL2 prescription</div></div></div>
       <div class="audio-pool" hidden><audio data-i="0" preload="none" src="audio/omha_flat_original.m4a"></audio><audio data-i="1" preload="none" src="audio/omha_flat_ours.m4a"></audio><audio data-i="2" preload="none" src="audio/omha_flat_nal_nl2.m4a"></audio><audio data-i="3" preload="none" src="audio/omha_flat_dsl_mio.m4a"></audio><audio data-i="4" preload="none" src="audio/omha_flat_camfit.m4a"></audio></div>
     </section>
 
@@ -415,7 +427,7 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
         <span class="time"><b>0:00</b> / <span>0:20</span></span>
       </div>
       <p class="cue"><span class="dot"></span><b class="cur">Original</b><span class="hint">&mdash; loudness-matched; compare our fit to the clinical prescriptions</span></p>
-        <div class="siirow"><b>ANSI SII (0–1):</b> Original 0.42  &middot;  Ours (Rx) 0.56  &middot;  NAL-NL2 0.75  &middot;  DSL m[i/o] 0.80  &middot;  CAMFIT 0.74</div></div>
+        <div class="siirow"><div><b>ANSI SII (0–1):</b> Original 0.42  &middot;  Ours (Rx) 0.56  &middot;  NAL-NL2 0.75  &middot;  DSL m[i/o] 0.80  &middot;  CAMFIT 0.74</div><div><b>STOI (0–1):</b> Original 1.00  &middot;  Ours (Rx) 0.97  &middot;  NAL-NL2 0.69  &middot;  DSL m[i/o] 0.64  &middot;  CAMFIT 0.67</div><div><b>dB RMS to NAL target:</b> Original 17  &middot;  Ours (Rx) 8  &middot;  NAL-NL2 6  &middot;  DSL m[i/o] 12  &middot;  CAMFIT 4</div><div class="metleg">SII &amp; STOI: higher = better &middot; dB&#8209;to&#8209;target: closer to 0 = closer to the NAL&#8209;NL2 prescription</div></div></div>
       <div class="audio-pool" hidden><audio data-i="0" preload="none" src="audio/omha_skislope_original.m4a"></audio><audio data-i="1" preload="none" src="audio/omha_skislope_ours.m4a"></audio><audio data-i="2" preload="none" src="audio/omha_skislope_nal_nl2.m4a"></audio><audio data-i="3" preload="none" src="audio/omha_skislope_dsl_mio.m4a"></audio><audio data-i="4" preload="none" src="audio/omha_skislope_camfit.m4a"></audio></div>
     </section>
     <p class="band-label">Subjects vs OpenMHA &mdash; binaural, each ear fit on its own audiogram</p>
@@ -436,7 +448,7 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
         <span class="time"><b>0:00</b> / <span>0:20</span></span>
       </div>
       <p class="cue"><span class="dot"></span><b class="cur">Original</b><span class="hint">&mdash; headphones: each ear is fit on its own audiogram; loudness-matched</span></p>
-        <div class="siirow"><b>ANSI SII, poorer ear (0–1):</b> Original 0.05  &middot;  Ours (Rx) 0.26  &middot;  NAL-NL2 0.63  &middot;  DSL m[i/o] 0.72  &middot;  CAMFIT / CAM2 0.55</div></div>
+        <div class="siirow"><div><b>ANSI SII, poorer ear (0–1):</b> Original 0.05  &middot;  Ours (Rx) 0.26  &middot;  NAL-NL2 0.63  &middot;  DSL m[i/o] 0.72  &middot;  CAMFIT / CAM2 0.55</div><div><b>STOI (0–1):</b> Original 1.00  &middot;  Ours (Rx) 0.94  &middot;  NAL-NL2 0.66  &middot;  DSL m[i/o] 0.64  &middot;  CAMFIT / CAM2 0.67</div><div><b>dB RMS to NAL target:</b> Original 22  &middot;  Ours (Rx) 10  &middot;  NAL-NL2 8  &middot;  DSL m[i/o] 13  &middot;  CAMFIT / CAM2 5</div><div class="metleg">SII &amp; STOI: higher = better &middot; dB&#8209;to&#8209;target: closer to 0 = closer to the NAL&#8209;NL2 prescription</div></div></div>
       <div class="audio-pool" hidden><audio data-i="0" preload="none" src="audio/subomha_speech_a_original.m4a"></audio><audio data-i="1" preload="none" src="audio/subomha_speech_a_ours.m4a"></audio><audio data-i="2" preload="none" src="audio/subomha_speech_a_nal_nl2.m4a"></audio><audio data-i="3" preload="none" src="audio/subomha_speech_a_dsl_mio.m4a"></audio><audio data-i="4" preload="none" src="audio/subomha_speech_a_camfit.m4a"></audio></div>
     </section>
 
@@ -456,7 +468,7 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
         <span class="time"><b>0:00</b> / <span>0:20</span></span>
       </div>
       <p class="cue"><span class="dot"></span><b class="cur">Original</b><span class="hint">&mdash; headphones: each ear is fit on its own audiogram; loudness-matched</span></p>
-        <div class="siirow"><b>ANSI SII, poorer ear (0–1):</b> Original 0.51  &middot;  Ours (Rx) 0.76  &middot;  NAL-NL2 0.82  &middot;  DSL m[i/o] 0.86  &middot;  CAMFIT / CAM2 0.82</div></div>
+        <div class="siirow"><div><b>ANSI SII, poorer ear (0–1):</b> Original 0.51  &middot;  Ours (Rx) 0.76  &middot;  NAL-NL2 0.82  &middot;  DSL m[i/o] 0.86  &middot;  CAMFIT / CAM2 0.82</div><div><b>STOI (0–1):</b> Original 1.00  &middot;  Ours (Rx) 0.95  &middot;  NAL-NL2 0.61  &middot;  DSL m[i/o] 0.55  &middot;  CAMFIT / CAM2 0.64</div><div><b>dB RMS to NAL target:</b> Original 14  &middot;  Ours (Rx) 6  &middot;  NAL-NL2 3  &middot;  DSL m[i/o] 11  &middot;  CAMFIT / CAM2 3</div><div class="metleg">SII &amp; STOI: higher = better &middot; dB&#8209;to&#8209;target: closer to 0 = closer to the NAL&#8209;NL2 prescription</div></div></div>
       <div class="audio-pool" hidden><audio data-i="0" preload="none" src="audio/subomha_musician_a_original.m4a"></audio><audio data-i="1" preload="none" src="audio/subomha_musician_a_ours.m4a"></audio><audio data-i="2" preload="none" src="audio/subomha_musician_a_nal_nl2.m4a"></audio><audio data-i="3" preload="none" src="audio/subomha_musician_a_dsl_mio.m4a"></audio><audio data-i="4" preload="none" src="audio/subomha_musician_a_camfit.m4a"></audio></div>
     </section>
 
@@ -479,26 +491,32 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
         <div class="panel">
           <label class="filebtn">Choose audio<input type="file" id="tf" accept="audio/*"></label>
           <span id="fname" class="fname">no file chosen yet</span>
-          <div class="presets">audiogram:
+          <div class="presets">audiogram preset:
             <button data-preset="normal">normal</button><button data-preset="sloping">sloping</button>
             <button data-preset="flat">flat 40</button><button data-preset="ski">ski-slope</button>
             <button data-preset="cookie">cookie-bite</button><button data-preset="reverse">reverse</button>
             <button data-preset="notch">noise-notch</button></div>
-          <div class="agwrap"><canvas id="agc" width="290" height="170"></canvas>
-            <div class="sliders" id="sliders"></div></div>
+          <div class="earmode"><span class="earmode-lbl">ears:</span>
+            <button type="button" id="earOne" class="segbtn on">one &mdash; same both sides</button>
+            <button type="button" id="earTwo" class="segbtn">two &mdash; left / right</button></div>
+          <div class="ears">
+            <div class="agwrap" id="agwrapL">
+              <div class="agcol"><span class="earlbl" id="earlblL">audiogram</span>
+                <canvas id="agc" width="290" height="170"></canvas></div>
+              <div class="sliders" id="sliders"></div></div>
+            <div class="agwrap ear2" id="agwrap2" hidden>
+              <div class="agcol"><span class="earlbl earR">right ear</span>
+                <canvas id="agc2" width="290" height="170"></canvas>
+                <div class="minirow"><button id="copyLR" type="button" class="minibtn">copy L &rarr; R</button>
+                  <button id="copyRL" type="button" class="minibtn">copy R &rarr; L</button></div></div>
+              <div class="sliders" id="sliders2"></div></div>
+          </div>
           <div class="rowctl"><label for="level">Input level</label>
             <select id="level"><option value="50">soft &middot; 50</option><option value="65" selected>normal &middot; 65</option>
             <option value="80">loud &middot; 80</option></select><span>dB SPL</span></div>
           <details class="advanced">
             <summary>More options &mdash; program, noise &amp; reverb, bone/OHC, frequency lowering, "hear as the patient"</summary>
             <p class="advgrp">Fitting</p>
-            <label class="chk"><input type="checkbox" id="binaural"> Two ears (binaural)
-              <span class="chknote">&mdash; set a different right-ear audiogram; every fit runs per ear and the output is stereo</span></label>
-            <div class="agwrap ear2" id="agwrap2" hidden>
-              <div><span class="earlbl">right ear</span>
-                <canvas id="agc2" width="290" height="170"></canvas>
-                <button id="copyLR" type="button" class="minibtn">copy left &rarr; right</button></div>
-              <div class="sliders" id="sliders2"></div></div>
             <div class="rowctl"><label for="prog">Program</label>
               <select id="prog"><option value="speech" selected>speech</option>
               <option value="music">music (slow release)</option></select><span>music = wide dynamics</span></div>
@@ -816,6 +834,7 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
   var FREQS = [250, 500, 1000, 2000, 4000, 8000];
   var ag = [20, 25, 30, 40, 55, 65];                   // left ear (also the mono audiogram)
   var agR = ag.slice();                                // right ear (used only in binaural mode)
+  var binauralOn = false, binaEverOn = false;
   var SR = 32000, CAP = 10;                            // process up to 10 s (each fit is a full DSP pass)
   var input = null, fileName = "", urls = {}, clips = {};
   var KEYS = ["original", "static", "wdrc", "rx", "nal", "dsl", "cam", "per"], specCache = {};
@@ -844,9 +863,11 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
     function row(lab, arr, fmt) {
       return '<div><b>' + lab + '</b> ' + L.map(function (n, i) { return n + " " + (arr && arr[i] != null ? fmt(arr[i]) : "–"); }).join("  ·  ") + '</div>';
     }
-    var h = row("ANSI SII (0–1):", si, function (v) { return v.toFixed(2); });
-    if (st) h += row("STOI (0–1):", st, function (v) { return v.toFixed(2); });
-    if (er) h += row("dB RMS to NAL target:", er, function (v) { return v.toFixed(0); });
+    var ear = binauralOn ? ", poorer ear" : "";
+    var h = row("ANSI SII (0–1" + ear + "):", si, function (v) { return v.toFixed(2); });
+    if (st) h += row("STOI (0–1" + ear + "):", st, function (v) { return v.toFixed(2); });
+    if (er) h += row("dB RMS to NAL target" + ear + ":", er, function (v) { return v.toFixed(0); });
+    h += '<div class="metleg">SII &amp; STOI: higher = better (more audible / intelligible) &middot; dB&#8209;to&#8209;target: closer to 0 = closer to the NAL&#8209;NL2 prescription</div>';
     el.innerHTML = h; el.style.display = "";
   }
   function ltas(a) {                                   // Welch long-term magnitude spectrum (dB) via DSP.fft
@@ -940,7 +961,19 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
   function buildSliders() { buildSlidersOn("sliders", ag, "--teal"); buildSlidersOn("sliders2", agR, "--blue"); }
   function preset(name) {
     var P = { normal:[5,5,5,5,10,10], sloping:[20,25,30,40,55,65], flat:[40,42,45,45,48,50], ski:[15,20,30,50,70,80], cookie:[15,35,55,55,35,20], reverse:[60,55,45,30,25,25], notch:[10,15,25,55,30,20] };
-    ag = P[name].slice(); buildSliders(); drawAg();          // presets set the LEFT ear (right kept as the user has it)
+    ag = P[name].slice();
+    if (binauralOn) agR = P[name].slice();                   // two-ear mode: a preset seeds both ears symmetrically
+    buildSliders(); drawAg();
+  }
+  function setEarMode(two) {
+    binauralOn = two;
+    if (two && !binaEverOn) { agR = ag.slice(); binaEverOn = true; }   // start the right ear matched to the left
+    var w = $("agwrap2"); if (w) w.hidden = !two;
+    if ($("earlblL")) $("earlblL").textContent = two ? "left ear" : "audiogram";
+    if ($("earlblL")) $("earlblL").classList.toggle("earR", false);
+    if ($("earOne")) $("earOne").classList.toggle("on", !two);
+    if ($("earTwo")) $("earTwo").classList.toggle("on", two);
+    buildSliders(); drawAg();
   }
 
   // ---- Pyodide (real module) ---------------------------------------------------------
@@ -953,14 +986,15 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
     return loadScript(U + "pyodide.js")
       .then(function () { return loadPyodide({ indexURL: U }); })
       .then(function (py) { pyodide = py; engine("engine: loading numpy / scipy…"); return py.loadPackage(["numpy", "scipy"]); })
-      .then(function () { return Promise.all(["./speech_resynth.py", "./fitting.py", "./sii.py", "./stoi_vendor.py"].map(function (u) { return fetch(u); })); })
+      .then(function () { return Promise.all(["./speech_resynth.py", "./fitting.py", "./sii.py", "./stoi_vendor.py", "./metrics.py"].map(function (u) { return fetch(u); })); })
       .then(function (rs) { if (rs.some(function (r) { return !r.ok; })) throw new Error("module fetch failed"); return Promise.all(rs.map(function (r) { return r.text(); })); })
       .then(function (srcs) {
         pyodide.FS.writeFile("speech_resynth.py", srcs[0]);
         pyodide.FS.writeFile("fitting.py", srcs[1]);
         pyodide.FS.writeFile("sii.py", srcs[2]);                        // vendored ANSI SII (Malcolm Slaney)
         pyodide.FS.writeFile("stoi_vendor.py", srcs[3]);               // vendored STOI (Taal et al.)
-        pyodide.runPython("import numpy as np\nimport speech_resynth as sp\nimport fitting\nimport sii\nimport stoi_vendor");
+        pyodide.FS.writeFile("metrics.py", srcs[4]);                   // shared SII/STOI/dB-to-target (same as gallery)
+        pyodide.runPython("import numpy as np\nimport speech_resynth as sp\nimport fitting\nimport sii\nimport stoi_vendor\nimport metrics");
         pyReady = true; pyBooting = false; engine("engine: exact — Python (numpy / scipy) + OpenMHA-style fittings");
       })
       .catch(function (e) { pyFailed = true; pyBooting = false;
@@ -983,36 +1017,27 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
     "xfit = xin2",                                                                // aid input
     "if nr:",                                                                     // noise reduction (aid-side)
     "    xfit = sp.denoise(xin2, sr); xfit = xfit / (np.sqrt(np.mean(xfit**2)) + 1e-12) * 10**((spl - 100) / 20)",
-    "mbf = np.asarray(sii.mid_band_freqs, float)",                                // 18 one-third-octave bands
-    "def _bl18(y):",
-    "    Y = np.abs(np.fft.rfft(y*np.hanning(len(y))))**2; ff = np.fft.rfftfreq(len(y), 1/sr)",
-    "    return np.array([10*np.log10(Y[(ff>=f0/2**(1/6))&(ff<f0*2**(1/6))].sum()+1e-12) for f0 in mbf])",
-    "tgt = np.asarray(fitting.prescribe('nal_nl2', ag, list(mbf), (65.0,)))[0]",  // NAL-NL2 target insertion gain
-    "bl_un = _bl18(xclean)",
     "pm = sp.PersonalizedGainMap(fc, audiogram=ag)",
     "GAINS = {'static': (pm, False), 'wdrc': (pm, True), 'rx': (sp.PrescriptiveGain(fc, ag), True),",
     "         'nal': (fitting.GainTableWDRC(fc, ag, 'nal_nl2'), True), 'dsl': (fitting.GainTableWDRC(fc, ag, 'dsl_mio'), True),",
     "         'cam': (fitting.GainTableWDRC(fc, ag, 'camfit'), True),",                                  // exact Cambridge/CAMFIT (CAM2)
     "         'per': (sp.PersonalizedWDRC(fc, audiogram=ag, airbone_gap=gap, ohc_health=ohc), True)}",   // bone/OHC-aware
     "rel_eff = 800.0 if prog == 'music' else float(rel)",                          // music program: slow release for wide dynamics
+    "ORDER = ['original','static','wdrc','rx','nal','dsl','cam','per']",
     "OUT = {'original': xin2.astype('float32')}",
-    "SII = {'original': round(sp.official_sii(xin2, xclean, sr, ag), 2)}",
-    "STOI = {'original': round(float(stoi_vendor.stoi(xclean, xin2, sr)), 2)}",
-    "ERR = {'original': round(float(np.sqrt(np.mean(((_bl18(xin2)-bl_un)-tgt)**2))), 1)}",
+    "MET = {'original': metrics.all_metrics(xin2, xclean, sr, ag)}",             // SII + STOI + dB-to-NAL-target
     "for _k,(_g,_dyn) in GAINS.items():",
     "    _r = sp.run(xfit, sr, gain=_g, attack_ms=(5 if _dyn else None), release_ms=(rel_eff if _dyn else None), **cm)",
     "    _y = _r['waveform']",
     "    OUT[_k] = _y.astype('float32')",
-    "    SII[_k] = round(sp.official_sii(_y, xclean, sr, ag), 2)",
-    "    STOI[_k] = round(float(stoi_vendor.stoi(xclean, _y, sr)), 2)",
-    "    ERR[_k] = round(float(np.sqrt(np.mean(((_bl18(_y)-bl_un)-tgt)**2))), 1)",   // dB RMS vs NAL target
+    "    MET[_k] = metrics.all_metrics(_y, xclean, sr, ag)",
     "if losssim:",                                                               // 'hear it as the patient does'
     "    LS = sp.HearingLossSim(fc, ag)",
     "    for _k in list(OUT): OUT[_k] = sp.run(np.asarray(OUT[_k], dtype=float), sr, gain=LS, **cm)['waveform'].astype('float32')",
     "yo=OUT['original']; ys=OUT['static']; yw=OUT['wdrc']; yr=OUT['rx']; yn=OUT['nal']; yd=OUT['dsl']; yc=OUT['cam']; yp=OUT['per']",
-    "si=[SII[k] for k in ['original','static','wdrc','rx','nal','dsl','cam','per']]",
-    "st=[STOI[k] for k in ['original','static','wdrc','rx','nal','dsl','cam','per']]",
-    "er=[ERR[k] for k in ['original','static','wdrc','rx','nal','dsl','cam','per']]"
+    "si=[MET[k]['sii'] for k in ORDER]",
+    "st=[MET[k]['stoi'] for k in ORDER]",
+    "er=[MET[k]['err'] for k in ORDER]"
   ].join("\n");
 
   function opts() {
@@ -1023,7 +1048,7 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
              noise: $("noise") ? +$("noise").value : -1, nr: !!($("nr") && $("nr").checked),
              prog: $("prog") ? $("prog").value : "speech",
              ntype: $("ntype") ? $("ntype").value : "ssn", rev: $("rev") ? +$("rev").value : 0,
-             binaural: !!($("binaural") && $("binaural").checked) };
+             binaural: binauralOn };
   }
   function runEngine(agVals) {                            // agVals: audiogram to fit (one ear); defaults to left
     var o = opts(); agVals = agVals || ag;
@@ -1191,11 +1216,10 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
     if ($("ohc")) $("ohc").addEventListener("input", function () { $("ohcv").textContent = $("ohc").value + "%"; });
     document.querySelectorAll("[data-preset]").forEach(function (b) {
       b.addEventListener("click", function () { preset(b.dataset.preset); }); });
-    if ($("binaural")) $("binaural").addEventListener("change", function () {
-      var on = $("binaural").checked; var w = $("agwrap2"); if (w) w.hidden = !on;
-      if (on) { buildSliders(); drawAg(); } });
-    if ($("copyLR")) $("copyLR").addEventListener("click", function () {
-      agR = ag.slice(); buildSliders(); drawAg(); });
+    if ($("earOne")) $("earOne").addEventListener("click", function () { setEarMode(false); });
+    if ($("earTwo")) $("earTwo").addEventListener("click", function () { setEarMode(true); });
+    if ($("copyLR")) $("copyLR").addEventListener("click", function () { agR = ag.slice(); buildSliders(); drawAg(); });
+    if ($("copyRL")) $("copyRL").addEventListener("click", function () { ag = agR.slice(); buildSliders(); drawAg(); });
     $("run").addEventListener("click", process);
     for (var i = 0; i < KEYS.length; i++) { pool[i] = new Audio(); pool[i].preload = "auto"; }
     blind.ba = new Audio(); blind.bb = new Audio();

@@ -13,7 +13,8 @@ SC = "/private/tmp/claude-502/-Users-tabaxitft-Desktop-STEMM-HEAR/02cdbe4e-d460-
 PROJ = "/Users/tabaxitft/Desktop/STEMM-HEAR/FILTER BANKS/speech_resynthesis"
 OMHA = os.path.join(PROJ, "openmha", "out")
 sys.path.insert(0, os.path.join(PROJ, "colab")); sys.path.insert(0, os.path.join(PROJ, "openmha"))
-import speech_resynth as sp, fitting
+sys.path.append(os.path.join(PROJ, "web"))
+import speech_resynth as sp, fitting, metrics
 SR = 16000
 FC = sp.band_centres(sp.band_edges(100.0, 7200.0, 28, "greenwood"))
 COMMON = dict(backend="stft", n_bands=28, flo=100.0, fhi=7200.0, carrier="original",
@@ -85,8 +86,8 @@ for aid, ag in AUDIOGRAMS.items():
     p = os.path.join(SC, f"omha_{aid}.png"); aud_png(ag, p)
     out["audiograms"].append(dict(id=aid, name=NAME[aid], png=png_b64(p),
         conditions=[dict(id=c, label=l, sub=s, cls=cl,
-                         sii=round(float(sp.official_sii(raw[c], raw['original'], SR, ag)), 2),
-                         file=write_aac(clips[c], f"omha_{aid}_{c}")) for c,l,s,cl in COND]))
+                         file=write_aac(clips[c], f"omha_{aid}_{c}"),
+                         **metrics.all_metrics(raw[c], raw['original'], SR, ag)) for c,l,s,cl in COND]))
     print(f"{aid}: rendered 5 conditions")
 
 out["validation_db"] = round(float(np.mean(valdiffs)), 1)
