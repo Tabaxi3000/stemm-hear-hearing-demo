@@ -61,8 +61,10 @@ def metric_rows(items, sii_label="ANSI SII (0–1)"):     # items: [(name, {sii,
     return ('<div class="siirow">'
             + row(sii_label, "sii", lambda v: f"{v:.2f}")
             + row("STOI (0–1)", "stoi", lambda v: f"{v:.2f}")
-            + row("dB RMS to NAL target", "err", lambda v: f"{v:.0f}")
-            + '<div class="metleg">SII &amp; STOI: higher = better &middot; dB&#8209;to&#8209;target: closer to 0 = closer to the NAL&#8209;NL2 prescription</div>'
+            + row("dB RMS to NAL-NL2 ref", "err", lambda v: f"{v:.0f}")
+            + '<div class="metleg">SII &amp; STOI: higher = better &middot; dB&#8209;to&#8209;ref measures each fit\'s shaping '
+              'against one common yardstick (the NAL&#8209;NL2 prescription), so NAL&#8209;NL2 sits near 0 by design '
+              'and the others show how far they differ (not worse).</div>'
             + '</div>')
 
 
@@ -235,6 +237,9 @@ TOOL_CSS = """
 .siirow{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:12px;padding-top:10px;
   border-top:1px dashed var(--line);line-height:1.7} .siirow b{color:var(--ink)}
 .metleg{font-size:10.5px;color:var(--muted);opacity:.85;margin-top:7px;line-height:1.5;border-top:none;padding-top:0}
+.verdict{font-family:var(--mono);font-size:12px;color:var(--ink);background:color-mix(in srgb,var(--teal) 8%,transparent);
+  border:1px solid var(--line);border-left:3px solid var(--teal);border-radius:8px;padding:8px 11px;margin-top:12px;line-height:1.5}
+.verdict b{color:var(--teal)}
 .tprog{display:flex;align-items:center;gap:9px;margin-top:9px}
 .tprog-bar{flex:1;height:7px;border-radius:6px;background:var(--line);overflow:hidden}
 .tprog-bar>i{display:block;height:100%;width:0;background:var(--teal);transition:width .18s ease}
@@ -395,6 +400,7 @@ TOOL_HTML = f"""
           </div>
           <p class="cue"><span class="dot"></span><b class="cur" id="tcur">Original</b><span class="hint">&mdash;
             process a file, then switch to compare</span></p>
+          <div id="tverdict" class="verdict" style="display:none"></div>
           <div id="siirow" class="siirow" style="display:none"></div>
           <canvas id="spec" width="460" height="150" class="spec" title="Long-term spectrum: dashed = original, solid = selected"></canvas>
           <div class="dlrow" id="dlrow" style="display:none">download:

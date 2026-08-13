@@ -29,19 +29,31 @@
     for (var i = 0; i < a.length; i++) o[i] = a[i] * g;
     return softknee(o);
   }
-  function showMetrics(si, st, er) {                   // SII (audibility) + STOI (intelligibility) + dB-to-target
+  var METLEG = '<div class="metleg">SII &amp; STOI: higher = better (more audible / intelligible) &middot; ' +
+    'dB&#8209;to&#8209;ref measures each fit\'s shaping against ONE common yardstick &mdash; the NAL&#8209;NL2 ' +
+    'prescription &mdash; so NAL&#8209;NL2 sits near 0 by design and the others show how far they differ (not worse).</div>';
+  function showMetrics(rows) {                          // rows: [{label, vals[8], fmt}, ...]
     var el = $("siirow"); if (!el) return;
-    if (!si) { el.style.display = "none"; return; }
+    if (!rows || !rows.length) { el.style.display = "none"; return; }
     var L = ["Original", "Static", "WDRC", "Rx", "NAL", "DSL", "CAM2", "Pers"];
-    function row(lab, arr, fmt) {
+    function line(lab, arr, fmt) {
       return '<div><b>' + lab + '</b> ' + L.map(function (n, i) { return n + " " + (arr && arr[i] != null ? fmt(arr[i]) : "–"); }).join("  ·  ") + '</div>';
     }
-    var ear = binauralOn ? ", poorer ear" : "";
-    var h = row("ANSI SII (0–1" + ear + "):", si, function (v) { return v.toFixed(2); });
-    if (st) h += row("STOI (0–1" + ear + "):", st, function (v) { return v.toFixed(2); });
-    if (er) h += row("dB RMS to NAL target" + ear + ":", er, function (v) { return v.toFixed(0); });
-    h += '<div class="metleg">SII &amp; STOI: higher = better (more audible / intelligible) &middot; dB&#8209;to&#8209;target: closer to 0 = closer to the NAL&#8209;NL2 prescription</div>';
-    el.innerHTML = h; el.style.display = "";
+    el.innerHTML = rows.map(function (r) { return line(r.label, r.vals, r.fmt); }).join("") + METLEG;
+    el.style.display = "";
+  }
+  // one-line, plain-language readout: which fit wins each metric (over the 7 fits, not Original)
+  function makeVerdict(si, st, er) {
+    if (!si) return "";
+    var idx = [1, 2, 3, 4, 5, 6, 7].filter(function (i) { return si[i] != null; });
+    if (!idx.length) return "";
+    var best = function (arr, better) { return idx.reduce(function (a, b) { return better(arr[b], arr[a]) ? b : a; }); };
+    var parts = [];
+    var bs = best(si, function (x, y) { return x > y; });
+    parts.push("Best audibility: <b>" + LABELS[bs] + "</b> (SII " + si[bs].toFixed(2) + ")");
+    if (st) { var bt = best(st, function (x, y) { return x > y; }); parts.push("clearest (STOI): <b>" + LABELS[bt] + "</b>"); }
+    if (er) { var bc = best(er, function (x, y) { return Math.abs(x) < Math.abs(y); }); parts.push("closest to the NAL-NL2 target: <b>" + LABELS[bc] + "</b>"); }
+    return parts.join(" &middot; ");
   }
   function ltas(a) {                                   // Welch long-term magnitude spectrum (dB) via DSP.fft
     if (typeof DSP === "undefined" || !a || a.length < 4096) return null;
@@ -275,14 +287,16 @@
       if (dl) { dl.href = urls[k]; dl.download = (fileName.replace(/\.[^.]+$/, "") || "clip") + "_" + k + ".wav"; dl.style.display = ""; }
     });
   }
-  function finishUp(si, st, er, msg) {
+  function finishUp(rows, verdict, msg) {
     progHide();
-    specCache = {}; showMetrics(si, st, er);
+    specCache = {}; showMetrics(rows);
+    if ($("tverdict")) { $("tverdict").innerHTML = verdict || ""; $("tverdict").style.display = verdict ? "" : "none"; }
     dur = input.length / SR;
     $("dlrow").style.display = "flex"; $("tplay").disabled = false;
     if ($("blindbtn")) $("blindbtn").disabled = false;
     active = 0; switchTo(0); drawSpec(); status(msg); $("run").disabled = false;
   }
+  var FMT2 = function (v) { return v.toFixed(2); }, FMT0 = function (v) { return v.toFixed(0); };
   function progShow(total) {
     var p = $("tprog"); if (!p) return;
     if (!total) { p.hidden = true; return; }               // fallback engine: no per-fit progress
@@ -323,8 +337,14 @@
         var mn = function (a, b) { return a && b ? a.map(function (v, i) { return Math.min(v, b[i]); }) : null; };
         var mx = function (a, b) { return a && b ? a.map(function (v, i) { return Math.max(v, b[i]); }) : null; };
         applyClips();
-        finishUp(mn(L.sii, R.sii), mn(L.stoi, R.stoi), mx(L.err, R.err),   // poorer ear (worse SII/STOI, larger dB error)
-                 "done — binaural, each ear fit on its own audiogram (headphones); SII is the poorer ear");
+        var brows = [                                      // show BOTH ears' SII; STOI/dB on the poorer ear
+          { label: "ANSI SII &mdash; left ear:", vals: L.sii, fmt: FMT2 },
+          { label: "ANSI SII &mdash; right ear:", vals: R.sii, fmt: FMT2 },
+          { label: "STOI (poorer ear):", vals: mn(L.stoi, R.stoi), fmt: FMT2 },
+          { label: "dB to NAL-NL2 ref (poorer ear):", vals: mx(L.err, R.err), fmt: FMT0 }
+        ];
+        finishUp(brows, makeVerdict(mn(L.sii, R.sii), mn(L.stoi, R.stoi), mx(L.err, R.err)),
+                 "done — binaural, each ear fit on its own audiogram (headphones); SII shown per ear");
         return;
       }
       var r = L;                                           // ---- mono ----
@@ -337,7 +357,12 @@
         KEYS.slice(1).forEach(function (k) { clips[k] = r[k] ? normalize(r[k], -20) : null; });
       }
       applyClips();
-      finishUp(r.sii, r.stoi, r.err,
+      var mrows = r.sii ? [
+        { label: "ANSI SII (0–1):", vals: r.sii, fmt: FMT2 },
+        { label: "STOI (0–1):", vals: r.stoi, fmt: FMT2 },
+        { label: "dB to NAL-NL2 ref:", vals: r.err, fmt: FMT0 }
+      ] : null;
+      finishUp(mrows, makeVerdict(r.sii, r.stoi, r.err),
                r.loss ? "done — heard through the loss (unaided degraded; aided restores it)" : r.levels ? "done — real levels (the aid makes it louder)"
                       : (r.nal ? "done — A/B all seven" : "done — NAL/DSL/CAM2 need the Python engine"));
     }).catch(function (e) { progHide(); status("processing failed: " + e.message); console.error(e); $("run").disabled = false; });
