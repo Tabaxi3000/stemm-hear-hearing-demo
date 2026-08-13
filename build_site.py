@@ -61,10 +61,13 @@ def metric_rows(items, sii_label="ANSI SII (0–1)"):     # items: [(name, {sii,
     return ('<div class="siirow">'
             + row(sii_label, "sii", lambda v: f"{v:.2f}")
             + row("STOI (0–1)", "stoi", lambda v: f"{v:.2f}")
+            + row("HASPI (0–1)", "haspi", lambda v: f"{v:.2f}")
             + row("dB RMS to NAL-NL2 ref", "err", lambda v: f"{v:.0f}")
-            + '<div class="metleg">SII &amp; STOI: higher = better &middot; dB&#8209;to&#8209;ref measures each fit\'s shaping '
-              'against one common yardstick (the NAL&#8209;NL2 prescription), so NAL&#8209;NL2 sits near 0 by design '
-              'and the others show how far they differ (not worse).</div>'
+            + '<div class="metleg">SII / STOI / <b>HASPI</b>: higher = better. <b>HASPI</b> (Kates &amp; Arehart) is '
+              'hearing&#8209;aid&#8209;specific &mdash; it models the impaired ear from the audiogram, so even a perfect '
+              'clip scores below 1 under a loss. dB&#8209;to&#8209;ref measures each fit\'s shaping against one common '
+              'yardstick (the NAL&#8209;NL2 prescription), so NAL&#8209;NL2 sits near 0 by design and the others show how '
+              'far they differ (not worse).</div>'
             + '</div>')
 
 
@@ -311,7 +314,9 @@ TOOL_HTML = f"""
       <p class="quickstart"><b>Quick start:</b> pick an audiogram preset (or drag the sliders) &rarr;
         <b>Choose audio</b> &rarr; <b>Process</b>, then click the tabs to A/B. Set your volume so <b>Original</b>
         is comfortable &mdash; it's presented at ~65&nbsp;dB&nbsp;SPL (normal conversation), and the fits lift it
-        from there. SII numbers are the <b>official ANSI S3.5</b> index.</p>
+        from there. SII numbers are the <b>official ANSI S3.5</b> index. (The gallery sections above also
+        report <b>HASPI</b>, a hearing-aid-specific metric; it runs an auditory model, too heavy for the
+        live in-browser tool, so here you get the fast SII&nbsp;/&nbsp;STOI.)</p>
       <div class="tool-grid">
         <div class="panel">
           <label class="filebtn">Choose audio<input type="file" id="tf" accept="audio/*"></label>

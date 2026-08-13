@@ -90,9 +90,9 @@ for sub in SUBJECTS:
     p = os.path.join(SC, f"subomha_{sub['id']}.png"); twoear_png(sub, p)
     conds = []
     for cid, lab, s, cl in COND:
-        pm = metrics.poorer_ear_metrics(stereo[cid], x65, SR, sub["aL"], sub["aR"])
+        pm = metrics.poorer_ear_metrics(stereo[cid], x65, SR, sub["aL"], sub["aR"], full=True)
         conds.append(dict(id=cid, label=lab, sub=s, cls=cl,
-                          sii=pm["sii"], stoi=pm["stoi"], err=pm["err"],
+                          sii=pm["sii"], stoi=pm["stoi"], err=pm["err"], haspi=pm["haspi"],
                           file=write_aac(clips[cid], f"subomha_{sub['id']}_{cid}")))
     out["subjects"].append(dict(id=sub["id"], name=sub["name"], kind=sub["kind"],
                                 placeholder=(sub["src"]=="music"), png=png_b64(p), conditions=conds))

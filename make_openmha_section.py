@@ -87,7 +87,7 @@ for aid, ag in AUDIOGRAMS.items():
     out["audiograms"].append(dict(id=aid, name=NAME[aid], png=png_b64(p),
         conditions=[dict(id=c, label=l, sub=s, cls=cl,
                          file=write_aac(clips[c], f"omha_{aid}_{c}"),
-                         **metrics.all_metrics(raw[c], raw['original'], SR, ag)) for c,l,s,cl in COND]))
+                         **metrics.all_metrics(raw[c], raw['original'], SR, ag, full=True)) for c,l,s,cl in COND]))
     print(f"{aid}: rendered 5 conditions")
 
 out["validation_db"] = round(float(np.mean(valdiffs)), 1)

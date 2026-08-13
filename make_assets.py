@@ -153,11 +153,11 @@ for A in AUDIOGRAMS:
     pth = os.path.join(SC, f"ag_{A['id']}.png"); audiogram_png(A["ag"], pth)
     cpth = os.path.join(SC, f"comp_{A['id']}.png"); comp_png(A["ag"], cpth)
     conds = [dict(id=cid, label=lbl, file=write_aac(clips[f"{A['id']}__{cid}"], f"shape_{A['id']}_{cid}"),
-                  **metrics.all_metrics(raw[f"{A['id']}__{cid}"], x65, SR, A["ag"]))
+                  **metrics.all_metrics(raw[f"{A['id']}__{cid}"], x65, SR, A["ag"], full=True))
              for cid, lbl, _ in CONDITIONS]
     assets["audiograms"].append(dict(id=A["id"], name=A["name"], blurb=A["blurb"],
                                      png=png_b64(pth), comp=png_b64(cpth),
-                                     orig=metrics.all_metrics(x65, x65, SR, A["ag"]), conditions=conds))
+                                     orig=metrics.all_metrics(x65, x65, SR, A["ag"], full=True), conditions=conds))
 
 json.dump(assets, open(os.path.join(SC, "assets.json"), "w"))
 print("wrote assets.json  %.3f MB (files in web/audio)" % (os.path.getsize(os.path.join(SC, "assets.json")) / 1e6))

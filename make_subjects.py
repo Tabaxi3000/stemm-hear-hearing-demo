@@ -111,13 +111,15 @@ for sub in SUBJECTS:
              ("binaural","Binaural","each ear its own fit","bin",binaural)]
     agp = os.path.join(SC, f"subj_{sub['id']}_ag.png"); subject_ag_png(sub, agp)
     iop = os.path.join(SC, f"subj_{sub['id']}_io.png"); subject_io_png(sub, iop)
+    def _cond(c, l, s, cl, a):
+        m = metrics.poorer_ear_metrics(a, x65, SR, sub["aL"], sub["aR"], full=True)   # one call per condition
+        return dict(id=c, label=l, sub=s, cls=cl, file=write_aac(a, f"subj_{sub['id']}_{c}"),
+                    sii=m["sii"], stoi=m["stoi"], err=m["err"], haspi=m["haspi"])
     out["subjects"].append(dict(
         id=sub["id"], name=sub["name"], kind=sub["kind"], blurb=sub["blurb"],
         placeholder=(sub["src"]=="music"), ild_db=round(float(ild),1),
         png=png_b64(agp), io=png_b64(iop),
-        conditions=[dict(id=c, label=l, sub=s, cls=cl, file=write_aac(a, f"subj_{sub['id']}_{c}"),
-                         **{k: metrics.poorer_ear_metrics(a, x65, SR, sub["aL"], sub["aR"])[k] for k in ("sii","stoi","err")})
-                    for c,l,s,cl,a in conds]))
+        conditions=[_cond(*t) for t in conds]))
     print(f"{sub['name']:12s} rendered | aided R-L level diff {ild:+.1f} dB")
 
 # ---- ILD / localization demo: a panned talker, independent vs linked compression -----
