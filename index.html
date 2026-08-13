@@ -1217,11 +1217,10 @@ footer .warn{border-left:2px solid var(--amber);padding-left:12px;margin-top:14p
       commentA: "", commentB: "", audiogram: ag.join("/"), level: o.spl, noise: o.noise,
       ntype: o.ntype, reverb: o.rev, nr: o.nr, prog: o.prog, binaural: binauralOn };
     blind.trials.push(blind.cur); blindSave();
-    $("breveal").innerHTML = "You preferred <b>" + LAB[win] + "</b> over " + LAB[lose] +
-      ".  (" + blind.trials.length + " logged) &mdash; add notes below, then continue.";
+    // stay fully blind on screen: never name the fits to the listener (identities live in the CSV only)
+    $("breveal").innerHTML = "You chose <b>" + which + "</b>. Trial " + blind.n + " logged (" +
+      blind.trials.length + " total) &mdash; add notes below, then continue.";
     blind.ba.pause(); blind.bb.pause();
-    if ($("bnlA")) $("bnlA").innerHTML = "Notes on A <b>(" + LAB[blind.A] + ")</b>";
-    if ($("bnlB")) $("bnlB").innerHTML = "Notes on B <b>(" + LAB[blind.B] + ")</b>";
     if ($("bcomment")) $("bcomment").style.display = "flex";
     blindPrefBtns(true);                                  // lock the choice; play buttons stay live for re-listening
     if ($("bcommentA")) $("bcommentA").focus();
