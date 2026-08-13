@@ -281,6 +281,13 @@ TOOL_CSS = """
 .bbtn.done{margin-top:12px;background:transparent;color:var(--muted);font-size:11px}
 .bsep{width:1px;align-self:stretch;background:var(--line);margin:2px 4px}
 .breveal{font-size:12.5px;color:var(--teal);min-height:18px;margin-top:10px}
+.bcomment{display:flex;flex-direction:column;gap:9px;margin:10px 0}
+.bnote{display:flex;flex-direction:column;gap:4px}
+.bnl{font-family:var(--mono);font-size:11px;color:var(--ink-2)} .bnl b{color:var(--teal)}
+.bcomment textarea{font-family:var(--sans);font-size:12.5px;color:var(--ink);background:var(--surface);
+  border:1.5px solid var(--line);border-radius:9px;padding:7px 9px;resize:vertical;min-height:38px;width:100%}
+.bcomment textarea:focus{outline:none;border-color:var(--teal)}
+.bcomment #bnext{align-self:flex-start}
 @media (max-width:560px){.tool-grid{grid-template-columns:1fr}.agwrap{flex-direction:column}}
 """
 
@@ -404,6 +411,13 @@ TOOL_HTML = f"""
               <button id="bprefA" class="bbtn pref">prefer&nbsp;A</button><button id="bprefB" class="bbtn pref">prefer&nbsp;B</button>
               <button id="bskip" class="bbtn">skip</button></div>
             <div id="breveal" class="breveal"></div>
+            <div id="bcomment" class="bcomment" style="display:none">
+              <label class="bnote"><span class="bnl" id="bnlA">Notes on A</span>
+                <textarea id="bcommentA" rows="2" placeholder="what stood out on A &mdash; good or bad?"></textarea></label>
+              <label class="bnote"><span class="bnl" id="bnlB">Notes on B</span>
+                <textarea id="bcommentB" rows="2" placeholder="what stood out on B, and what decided it?"></textarea></label>
+              <button id="bnext" class="bbtn pref">save &amp; next trial &rarr;</button>
+            </div>
             <button id="bdone" class="bbtn done">done &mdash; download CSV</button>
           </div>
         </div>

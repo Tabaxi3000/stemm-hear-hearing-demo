@@ -344,32 +344,55 @@
   }
 
   // ---- blind A/B preference test -----------------------------------------------------
-  var blind = { A: null, B: null, trials: [], ba: null, bb: null, n: 0 };
+  var blind = { A: null, B: null, trials: [], ba: null, bb: null, n: 0, cur: null };
   var LAB = {}; KEYS.forEach(function (k, i) { LAB[k] = LABELS[i]; });
+  function blindPrefBtns(disabled) {
+    ["bprefA", "bprefB", "bskip"].forEach(function (id) { if ($(id)) $(id).disabled = disabled; });
+  }
   function blindNext() {
     var ks = KEYS.filter(function (k) { return clips[k]; }); if (ks.length < 2) return;
     var i = Math.floor(Math.random() * ks.length), j; do { j = Math.floor(Math.random() * ks.length); } while (j === i);
-    blind.A = ks[i]; blind.B = ks[j];
+    blind.A = ks[i]; blind.B = ks[j]; blind.cur = null;
     if (blind.ba.src) URL.revokeObjectURL(blind.ba.src); if (blind.bb.src) URL.revokeObjectURL(blind.bb.src);
     blind.ba.src = URL.createObjectURL(toWav(clips[blind.A], SR)); blind.bb.src = URL.createObjectURL(toWav(clips[blind.B], SR));
     blind.n++; $("btrial").textContent = blind.n; $("breveal").textContent = "";
+    if ($("bcomment")) $("bcomment").style.display = "none";
+    if ($("bcommentA")) $("bcommentA").value = ""; if ($("bcommentB")) $("bcommentB").value = "";
+    blindPrefBtns(false);                                 // re-enable choosing for the new pair
   }
   function blindPlay(which) {
     var a = which === "A" ? blind.ba : blind.bb, o = which === "A" ? blind.bb : blind.ba;
     o.pause(); a.currentTime = o.currentTime || 0; a.play();
   }
   function blindPrefer(which) {
+    if (blind.cur) return;                                // already chose this trial; use "save & next"
     var win = which === "A" ? blind.A : blind.B, lose = which === "A" ? blind.B : blind.A, o = opts();
-    blind.trials.push({ trial: blind.n, prefer: win, over: lose, audiogram: ag.join("/"),
-      level: o.spl, noise: o.noise, ntype: o.ntype, reverb: o.rev, nr: o.nr, prog: o.prog });
-    try { localStorage.setItem("blind_ab", JSON.stringify(blind.trials)); } catch (e) {}
-    $("breveal").innerHTML = "You preferred <b>" + LAB[win] + "</b> over " + LAB[lose] + ".  (" + blind.trials.length + " logged)";
-    blind.ba.pause(); blind.bb.pause(); setTimeout(blindNext, 1300);
+    blind.cur = { trial: blind.n, clipA: blind.A, clipB: blind.B, prefer: win, over: lose,
+      commentA: "", commentB: "", audiogram: ag.join("/"), level: o.spl, noise: o.noise,
+      ntype: o.ntype, reverb: o.rev, nr: o.nr, prog: o.prog, binaural: binauralOn };
+    blind.trials.push(blind.cur); blindSave();
+    $("breveal").innerHTML = "You preferred <b>" + LAB[win] + "</b> over " + LAB[lose] +
+      ".  (" + blind.trials.length + " logged) &mdash; add notes below, then continue.";
+    blind.ba.pause(); blind.bb.pause();
+    if ($("bnlA")) $("bnlA").innerHTML = "Notes on A <b>(" + LAB[blind.A] + ")</b>";
+    if ($("bnlB")) $("bnlB").innerHTML = "Notes on B <b>(" + LAB[blind.B] + ")</b>";
+    if ($("bcomment")) $("bcomment").style.display = "flex";
+    blindPrefBtns(true);                                  // lock the choice; play buttons stay live for re-listening
+    if ($("bcommentA")) $("bcommentA").focus();
   }
+  function blindSave() { try { localStorage.setItem("blind_ab", JSON.stringify(blind.trials)); } catch (e) {} }
+  function csvCell(v) { v = (v == null ? "" : String(v)); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
   function blindCSV() {
-    var rows = [["trial", "preferred", "over", "audiogram", "level_dB", "noise_SNR", "noise_type", "reverb", "NR", "program"]];
-    blind.trials.forEach(function (t) { rows.push([t.trial, t.prefer, t.over, t.audiogram, t.level, t.noise, t.ntype, t.reverb, t.nr, t.prog]); });
-    var url = URL.createObjectURL(new Blob([rows.map(function (r) { return r.join(","); }).join("\n")], { type: "text/csv" }));
+    var cols = ["trial", "clipA", "clipB", "preferred", "over", "comment_A", "comment_B",
+      "audiogram", "level_dB", "noise_SNR", "noise_type", "reverb", "NR", "program", "binaural"];
+    var rows = [cols];
+    blind.trials.forEach(function (t) {
+      rows.push([t.trial, LAB[t.clipA] || t.clipA, LAB[t.clipB] || t.clipB, LAB[t.prefer] || t.prefer,
+        LAB[t.over] || t.over, t.commentA, t.commentB, t.audiogram, t.level, t.noise, t.ntype,
+        t.reverb, t.nr, t.prog, t.binaural]);
+    });
+    var body = rows.map(function (r) { return r.map(csvCell).join(","); }).join("\r\n");
+    var url = URL.createObjectURL(new Blob([body], { type: "text/csv" }));
     var a = document.createElement("a"); a.href = url; a.download = "blind_ab_" + Date.now() + ".csv"; a.click();
   }
 
@@ -398,6 +421,9 @@
     if ($("bprefA")) $("bprefA").addEventListener("click", function () { blindPrefer("A"); });
     if ($("bprefB")) $("bprefB").addEventListener("click", function () { blindPrefer("B"); });
     if ($("bskip")) $("bskip").addEventListener("click", blindNext);
+    if ($("bnext")) $("bnext").addEventListener("click", blindNext);
+    if ($("bcommentA")) $("bcommentA").addEventListener("input", function () { if (blind.cur) { blind.cur.commentA = $("bcommentA").value; blindSave(); } });
+    if ($("bcommentB")) $("bcommentB").addEventListener("input", function () { if (blind.cur) { blind.cur.commentB = $("bcommentB").value; blindSave(); } });
     if ($("bdone")) $("bdone").addEventListener("click", blindCSV);
     pool.forEach(function (a) { a.addEventListener("ended", function () { setOn(false);
       pool.forEach(function (x) { x.currentTime = 0; }); $("tfill").style.width = "0%"; $("tseek").value = 0; }); });
