@@ -235,6 +235,10 @@ TOOL_CSS = """
 .siirow{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:12px;padding-top:10px;
   border-top:1px dashed var(--line);line-height:1.7} .siirow b{color:var(--ink)}
 .metleg{font-size:10.5px;color:var(--muted);opacity:.85;margin-top:7px;line-height:1.5;border-top:none;padding-top:0}
+.tprog{display:flex;align-items:center;gap:9px;margin-top:9px}
+.tprog-bar{flex:1;height:7px;border-radius:6px;background:var(--line);overflow:hidden}
+.tprog-bar>i{display:block;height:100%;width:0;background:var(--teal);transition:width .18s ease}
+.tprog-txt{font-family:var(--mono);font-size:10.5px;color:var(--muted);white-space:nowrap}
 .runbtn{font-family:var(--mono);font-weight:600;font-size:14px;color:#fff;background:var(--teal);border:none;
   border-radius:10px;padding:10px 22px;cursor:pointer;transition:transform .06s}
 .runbtn:hover{transform:translateY(-1px)} .runbtn:disabled{opacity:.45;cursor:default;transform:none}
@@ -358,6 +362,7 @@ TOOL_HTML = f"""
               <span class="chknote">&mdash; through a simulation of the loss, so aided vs unaided shows the benefit</span></label>
           </details>
           <button id="run" class="runbtn" disabled>Process</button>
+          <div id="tprog" class="tprog" hidden><div class="tprog-bar"><i id="tprogfill"></i></div><span id="tprogtxt" class="tprog-txt"></span></div>
           <span id="tstatus" class="status">pick an audio file to start</span>
           <div id="engine" class="engine">engine: real Python module (Pyodide) &mdash; boots on first use</div>
         </div>

@@ -159,7 +159,7 @@
     return loadScript(U + "pyodide.js")
       .then(function () { return loadPyodide({ indexURL: U }); })
       .then(function (py) { pyodide = py; engine("engine: loading numpy / scipy…"); return py.loadPackage(["numpy", "scipy"]); })
-      .then(function () { return Promise.all(["./speech_resynth.py", "./fitting.py", "./sii.py", "./stoi_vendor.py", "./metrics.py"].map(function (u) { return fetch(u); })); })
+      .then(function () { return Promise.all(["./speech_resynth.py", "./fitting.py", "./sii.py", "./stoi_vendor.py", "./metrics.py", "./toolrun.py"].map(function (u) { return fetch(u); })); })
       .then(function (rs) { if (rs.some(function (r) { return !r.ok; })) throw new Error("module fetch failed"); return Promise.all(rs.map(function (r) { return r.text(); })); })
       .then(function (srcs) {
         pyodide.FS.writeFile("speech_resynth.py", srcs[0]);
@@ -167,52 +167,13 @@
         pyodide.FS.writeFile("sii.py", srcs[2]);                        // vendored ANSI SII (Malcolm Slaney)
         pyodide.FS.writeFile("stoi_vendor.py", srcs[3]);               // vendored STOI (Taal et al.)
         pyodide.FS.writeFile("metrics.py", srcs[4]);                   // shared SII/STOI/dB-to-target (same as gallery)
-        pyodide.runPython("import numpy as np\nimport speech_resynth as sp\nimport fitting\nimport sii\nimport stoi_vendor\nimport metrics");
+        pyodide.FS.writeFile("toolrun.py", srcs[5]);                   // incremental engine (one fit at a time)
+        pyodide.runPython("import numpy as np\nimport speech_resynth as sp\nimport fitting\nimport sii\nimport stoi_vendor\nimport metrics\nimport toolrun");
         pyReady = true; pyBooting = false; engine("engine: exact — Python (numpy / scipy) + OpenMHA-style fittings");
       })
       .catch(function (e) { pyFailed = true; pyBooting = false;
         engine("engine: approximate — JS fallback (Python unavailable)"); console.warn("Pyodide failed:", e); });
   }
-  var PYCODE = [
-    "ag = {int(f): float(v) for f, v in zip(list(agf), list(agv))}",
-    "fc = sp.band_centres(sp.band_edges(100.0, 12000.0, 32, 'greenwood'))",
-    "thr = sp.audiogram_thresholds(fc, ag)",
-    "imp = np.exp(-0.5*((np.log10(fc)-np.log10(1800.0))/0.42)**2)",
-    "cm = dict(backend='stft', n_bands=32, flo=100.0, fhi=12000.0, carrier='original',",
-    "          loud_ref=sp.dbfs_ref_for_spl(100.0), match_rms=False, gate_db=-45.0, gate_knee_db=18.0)",
-    "x = np.asarray(xin.to_py(), dtype=float)",
-    "x = sp.frequency_compress(x, sr, f_start=1500.0, ratio=flow) if flow > 1.01 else x",
-    "xclean = x / (np.sqrt(np.mean(x**2)) + 1e-12) * 10**((spl - 100) / 20)",     // clean reference (for STOI)
-    "xn = x",
-    "if rev > 0.05: xn = sp.reverb(xn, sr, rev)",                                 // reverberation
-    "if noise >= 0: xn = sp.add_noise(xn, float(noise), ntype)",                  // speech-in-noise (ssn / babble)
-    "xin2 = xn / (np.sqrt(np.mean(xn**2)) + 1e-12) * 10**((spl - 100) / 20)",     // degraded, at chosen SPL
-    "xfit = xin2",                                                                // aid input
-    "if nr:",                                                                     // noise reduction (aid-side)
-    "    xfit = sp.denoise(xin2, sr); xfit = xfit / (np.sqrt(np.mean(xfit**2)) + 1e-12) * 10**((spl - 100) / 20)",
-    "pm = sp.PersonalizedGainMap(fc, audiogram=ag)",
-    "GAINS = {'static': (pm, False), 'wdrc': (pm, True), 'rx': (sp.PrescriptiveGain(fc, ag), True),",
-    "         'nal': (fitting.GainTableWDRC(fc, ag, 'nal_nl2'), True), 'dsl': (fitting.GainTableWDRC(fc, ag, 'dsl_mio'), True),",
-    "         'cam': (fitting.GainTableWDRC(fc, ag, 'camfit'), True),",                                  // exact Cambridge/CAMFIT (CAM2)
-    "         'per': (sp.PersonalizedWDRC(fc, audiogram=ag, airbone_gap=gap, ohc_health=ohc), True)}",   // bone/OHC-aware
-    "rel_eff = 800.0 if prog == 'music' else float(rel)",                          // music program: slow release for wide dynamics
-    "ORDER = ['original','static','wdrc','rx','nal','dsl','cam','per']",
-    "OUT = {'original': xin2.astype('float32')}",
-    "MET = {'original': metrics.all_metrics(xin2, xclean, sr, ag)}",             // SII + STOI + dB-to-NAL-target
-    "for _k,(_g,_dyn) in GAINS.items():",
-    "    _r = sp.run(xfit, sr, gain=_g, attack_ms=(5 if _dyn else None), release_ms=(rel_eff if _dyn else None), **cm)",
-    "    _y = _r['waveform']",
-    "    OUT[_k] = _y.astype('float32')",
-    "    MET[_k] = metrics.all_metrics(_y, xclean, sr, ag)",
-    "if losssim:",                                                               // 'hear it as the patient does'
-    "    LS = sp.HearingLossSim(fc, ag)",
-    "    for _k in list(OUT): OUT[_k] = sp.run(np.asarray(OUT[_k], dtype=float), sr, gain=LS, **cm)['waveform'].astype('float32')",
-    "yo=OUT['original']; ys=OUT['static']; yw=OUT['wdrc']; yr=OUT['rx']; yn=OUT['nal']; yd=OUT['dsl']; yc=OUT['cam']; yp=OUT['per']",
-    "si=[MET[k]['sii'] for k in ORDER]",
-    "st=[MET[k]['stoi'] for k in ORDER]",
-    "er=[MET[k]['err'] for k in ORDER]"
-  ].join("\n");
-
   function opts() {
     return { rel: +$("rel").value, spl: $("level") ? +$("level").value : 65,
              flow: $("flow") ? +$("flow").value : 1, loss: $("losssim") ? $("losssim").checked : false,
@@ -223,31 +184,49 @@
              ntype: $("ntype") ? $("ntype").value : "ssn", rev: $("rev") ? +$("rev").value : 0,
              binaural: binauralOn };
   }
-  function runEngine(agVals) {                            // agVals: audiogram to fit (one ear); defaults to left
+  function yieldUI() { return new Promise(function (r) { setTimeout(r, 0); }); }   // let the browser repaint
+
+  // Run ONE ear on the real engine, one fit at a time, yielding to the UI between fits (onFit()
+  // fires after each) so the main thread never locks up -> no "page unresponsive" popups.
+  function runEngineAsync(agVals, onFit) {
     var o = opts(); agVals = agVals || ag;
-    if (pyReady) {
-      pyodide.globals.set("xin", input);
-      pyodide.globals.set("agf", pyodide.toPy(FREQS));
-      pyodide.globals.set("agv", pyodide.toPy(agVals));
-      pyodide.globals.set("sr", SR); pyodide.globals.set("rel", o.rel);
-      pyodide.globals.set("spl", o.spl); pyodide.globals.set("flow", o.flow); pyodide.globals.set("losssim", o.loss);
-      pyodide.globals.set("gap", o.gap); pyodide.globals.set("ohc", o.ohc);
-      pyodide.globals.set("noise", o.noise); pyodide.globals.set("nr", o.nr);
-      pyodide.globals.set("prog", o.prog);
-      pyodide.globals.set("ntype", o.ntype); pyodide.globals.set("rev", o.rev);
-      pyodide.runPython(PYCODE);
-      var G = function (n) { return Float32Array.from(pyodide.globals.get(n).toJs()); };
-      return Promise.resolve({ original: G("yo"), static: G("ys"), wdrc: G("yw"), rx: G("yr"), nal: G("yn"), dsl: G("yd"), cam: G("yc"), per: G("yp"),
-        sii: pyodide.globals.get("si").toJs(), stoi: pyodide.globals.get("st").toJs(), err: pyodide.globals.get("er").toJs(),
-        loss: o.loss, levels: o.levels });
+    if (!pyReady) {                                       // JS fallback (sync, fast; no NAL/DSL/CAM2/Pers/loss-sim)
+      var jo = { agFreqs: FREQS, agVals: agVals, presentSPL: o.spl, nBands: 32 };
+      return Promise.resolve({
+        static: DSP.process(input, SR, Object.assign({ mode: "static" }, jo)),
+        wdrc: DSP.process(input, SR, Object.assign({ mode: "wdrc", attackMs: 5, releaseMs: o.rel }, jo)),
+        rx: DSP.process(input, SR, Object.assign({ mode: "wdrc", attackMs: 5, releaseMs: o.rel, prescriptive: true }, jo)),
+        loss: false, levels: o.levels
+      });
     }
-    var jo = { agFreqs: FREQS, agVals: agVals, presentSPL: o.spl, nBands: 32 };   // JS fallback (no NAL/DSL/CAM2/Pers/loss-sim)
-    return Promise.resolve({
-      static: DSP.process(input, SR, Object.assign({ mode: "static" }, jo)),
-      wdrc: DSP.process(input, SR, Object.assign({ mode: "wdrc", attackMs: 5, releaseMs: o.rel }, jo)),
-      rx: DSP.process(input, SR, Object.assign({ mode: "wdrc", attackMs: 5, releaseMs: o.rel, prescriptive: true }, jo)),
-      loss: false, levels: o.levels
-    });
+    pyodide.globals.set("xin", input);
+    pyodide.globals.set("agf", pyodide.toPy(FREQS));
+    pyodide.globals.set("agv", pyodide.toPy(agVals));
+    pyodide.globals.set("sr", SR);
+    pyodide.globals.set("t_spl", o.spl); pyodide.globals.set("t_flow", o.flow);
+    pyodide.globals.set("t_noise", o.noise); pyodide.globals.set("t_ntype", o.ntype);
+    pyodide.globals.set("t_rev", o.rev); pyodide.globals.set("t_nr", o.nr);
+    pyodide.globals.set("t_gap", o.gap); pyodide.globals.set("t_ohc", o.ohc);
+    pyodide.globals.set("t_prog", o.prog); pyodide.globals.set("t_rel", o.rel);
+    var order = pyodide.runPython(
+      "toolrun.tool_setup(xin, agf, agv, sr, t_spl, t_flow, t_noise, t_ntype, t_rev, t_nr, t_gap, t_ohc, t_prog, t_rel)").toJs();
+    var fitKeys = order.slice(1);                         // 'original' is already computed in setup
+    return fitKeys.reduce(function (chain, k) {
+      return chain.then(yieldUI).then(function () {
+        pyodide.globals.set("t_k", k); pyodide.runPython("toolrun.tool_fit(t_k)");
+        if (onFit) onFit();
+      });
+    }, Promise.resolve())
+      .then(function () { if (o.loss) return yieldUI().then(function () { pyodide.runPython("toolrun.tool_losssim()"); }); })
+      .then(yieldUI)
+      .then(function () {
+        var res = { loss: o.loss, levels: o.levels };
+        order.forEach(function (k) { pyodide.globals.set("t_k", k);
+          res[k] = Float32Array.from(pyodide.runPython("toolrun.tool_get(t_k)").toJs()); });
+        var mt = pyodide.runPython("toolrun.tool_metrics()").toJs();
+        res.sii = mt[0]; res.stoi = mt[1]; res.err = mt[2];
+        return res;
+      });
   }
 
   // ---- file load: decode -> mono 32 kHz ----------------------------------------------
@@ -297,23 +276,38 @@
     });
   }
   function finishUp(si, st, er, msg) {
+    progHide();
     specCache = {}; showMetrics(si, st, er);
     dur = input.length / SR;
     $("dlrow").style.display = "flex"; $("tplay").disabled = false;
     if ($("blindbtn")) $("blindbtn").disabled = false;
     active = 0; switchTo(0); drawSpec(); status(msg); $("run").disabled = false;
   }
+  function progShow(total) {
+    var p = $("tprog"); if (!p) return;
+    if (!total) { p.hidden = true; return; }               // fallback engine: no per-fit progress
+    p.hidden = false; if ($("tprogfill")) $("tprogfill").style.width = "0%";
+    if ($("tprogtxt")) $("tprogtxt").textContent = "fit 0 / " + total;
+  }
+  function progStep(done, total) {
+    if ($("tprogfill")) $("tprogfill").style.width = Math.round(done / total * 100) + "%";
+    if ($("tprogtxt")) $("tprogtxt").textContent = "fit " + done + " / " + total;
+  }
+  function progHide() { var p = $("tprog"); if (p) p.hidden = true; }
   function peakOf(arrs) { var pk = 0, j, i; for (j = 0; j < arrs.length; j++) { var a = arrs[j]; for (i = 0; i < a.length; i++) { var v = Math.abs(a[i]); if (v > pk) pk = v; } } return pk; }
   function scaleTo(a, g) { var o = new Float32Array(a.length), i; for (i = 0; i < a.length; i++) o[i] = a[i] * g; return softknee(o); }
 
   function process() {
     if (!input) { status("pick a file first"); return; }
     $("run").disabled = true; status("processing…");
-    var o = opts(), bin;
+    var o = opts(), bin, done = 0, total;
     bootPyodide().then(function () {
       bin = o.binaural && pyReady;                         // binaural needs the Python engine (per-ear fits)
-      if (bin) return runEngine(ag).then(function (L) { return runEngine(agR).then(function (R) { return { L: L, R: R }; }); });
-      return runEngine(ag).then(function (L) { return { L: L }; });
+      total = pyReady ? (bin ? 14 : 7) : 0;                // 7 fits per ear
+      progShow(total);
+      function step() { progStep(++done, total); }
+      if (bin) return runEngineAsync(ag, step).then(function (L) { return runEngineAsync(agR, step).then(function (R) { return { L: L, R: R }; }); });
+      return runEngineAsync(ag, step).then(function (L) { return { L: L }; });
     }).then(function (res) {
       var L = res.L, R = res.R, common = L.loss || L.levels;
       if (bin) {                                           // ---- binaural: combine per-ear results into stereo ----
@@ -346,7 +340,7 @@
       finishUp(r.sii, r.stoi, r.err,
                r.loss ? "done — heard through the loss (unaided degraded; aided restores it)" : r.levels ? "done — real levels (the aid makes it louder)"
                       : (r.nal ? "done — A/B all seven" : "done — NAL/DSL/CAM2 need the Python engine"));
-    }).catch(function (e) { status("processing failed: " + e.message); console.error(e); $("run").disabled = false; });
+    }).catch(function (e) { progHide(); status("processing failed: " + e.message); console.error(e); $("run").disabled = false; });
   }
 
   // ---- blind A/B preference test -----------------------------------------------------
