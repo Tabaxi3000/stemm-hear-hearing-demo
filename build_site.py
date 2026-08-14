@@ -405,8 +405,8 @@ TOOL_HTML = f"""
         module</b> in your browser via Pyodide (numpy/scipy in WebAssembly), so the output is notebook-identical;
         the first run downloads ~30&nbsp;MB and falls back to a JS approximation if that can't load. Nothing is
         uploaded &mdash; it all runs on your machine.</p></div></div>
-      <p class="quickstart"><b>Quick start:</b> pick an audiogram preset (or drag the sliders) &rarr;
-        <b>Choose audio</b> (any format; up to <b>30&nbsp;s</b>, downmixed to mono at 32&nbsp;kHz) &rarr; <b>Process</b>, then click the tabs to A/B. Set your volume so <b>Original</b>
+      <p class="quickstart"><b>Quick start:</b> <b>1.</b> <b>Choose audio</b> (any format; up to <b>30&nbsp;s</b>, mono, 32&nbsp;kHz) &rarr;
+        <b>2.</b> set the <b>hearing loss</b> with a preset or the sliders below &rarr; <b>3.</b> <b>Process</b>, then click the tabs to A/B. Set your volume so <b>Original</b>
         is comfortable &mdash; it's presented at ~65&nbsp;dB&nbsp;SPL (normal conversation), and the fits lift it
         from there. SII numbers are the <b>official ANSI S3.5</b> index. (The gallery sections above also
         report <b>HASPI</b>, a hearing-aid-specific metric; it runs an auditory model, too heavy for the
@@ -415,7 +415,7 @@ TOOL_HTML = f"""
         <div class="panel">
           <label class="filebtn">Choose audio<input type="file" id="tf" accept="audio/*"></label>
           <span id="fname" class="fname">no file chosen yet</span><span id="fnote" class="fnote"></span>
-          <div class="presets">audiogram preset:
+          <div class="presets">hearing-loss preset:
             <button data-preset="normal">normal</button><button data-preset="sloping">sloping</button>
             <button data-preset="flat">flat 40</button><button data-preset="ski">ski-slope</button>
             <button data-preset="cookie">cookie-bite</button><button data-preset="reverse">reverse</button>
@@ -472,9 +472,9 @@ TOOL_HTML = f"""
             <label class="chk"><input type="checkbox" id="losssim"> Hear it as the patient does
               <span class="chknote">&mdash; through a simulation of the loss, so aided vs unaided shows the benefit</span></label>
           </details>
-          <button id="run" class="runbtn" disabled>Process</button>
+          <button id="run" class="runbtn">Process</button>
           <div id="tprog" class="tprog" hidden><div class="tprog-bar"><i id="tprogfill"></i></div><span id="tprogtxt" class="tprog-txt"></span></div>
-          <span id="tstatus" class="status">pick an audio file to start</span>
+          <span id="tstatus" class="status">Step 1: click “Choose audio” above to upload a file</span>
           <div id="engine" class="engine">engine: real Python module (Pyodide) &mdash; boots on first use</div>
         </div>
         <div class="panel">

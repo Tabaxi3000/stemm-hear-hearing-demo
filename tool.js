@@ -319,7 +319,7 @@
   function scaleTo(a, g) { var o = new Float32Array(a.length), i; for (i = 0; i < a.length; i++) o[i] = a[i] * g; return softknee(o); }
 
   function process() {
-    if (!input) { status("pick a file first"); return; }
+    if (!input) { status("↑ First click “Choose audio” to upload a file. (The sliders set the hearing loss, not the audio.)"); return; }
     $("run").disabled = true; status("processing…");
     var o = opts(), bin, done = 0, total;
     bootPyodide().then(function () {
