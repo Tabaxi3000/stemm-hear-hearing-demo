@@ -112,9 +112,12 @@ for sub in SUBJECTS:
     agp = os.path.join(SC, f"subj_{sub['id']}_ag.png"); subject_ag_png(sub, agp)
     iop = os.path.join(SC, f"subj_{sub['id']}_io.png"); subject_io_png(sub, iop)
     def _cond(c, l, s, cl, a):
-        m = metrics.poorer_ear_metrics(a, x65, SR, sub["aL"], sub["aR"], full=True)   # one call per condition
-        return dict(id=c, label=l, sub=s, cls=cl, file=write_aac(a, f"subj_{sub['id']}_{c}"),
-                    sii=m["sii"], stoi=m["stoi"], err=m["err"], haspi=m["haspi"])
+        m = metrics.poorer_ear_metrics(a, x65, SR, sub["aL"], sub["aR"], full=True, music=(sub["src"]=="music"))   # one call per condition
+        d = dict(id=c, label=l, sub=s, cls=cl, file=write_aac(a, f"subj_{sub['id']}_{c}"),
+                 sii=m["sii"], stoi=m["stoi"], err=m["err"])
+        for _k in ("haspi", "hasqi", "haaqi"):
+            if _k in m: d[_k] = m[_k]
+        return d
     out["subjects"].append(dict(
         id=sub["id"], name=sub["name"], kind=sub["kind"], blurb=sub["blurb"],
         placeholder=(sub["src"]=="music"), ild_db=round(float(ild),1),

@@ -23,10 +23,7 @@ from scipy.signal import (
     resample_poly,
 )
 
-try:
-    from clarity.enhancer.nalr import NALR  # not vendored: HASPI uses itype=0 (no NAL-R)
-except Exception:
-    NALR = None
+from .nalr import NALR
 from .audiogram import Audiogram
 
 if TYPE_CHECKING:

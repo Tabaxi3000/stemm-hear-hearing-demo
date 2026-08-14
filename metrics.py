@@ -34,16 +34,13 @@ def fit_error_db(aided, clean, sr, audiogram, rule="nal_nl2"):
     return float(np.sqrt(np.mean((ig - tgt) ** 2)))
 
 
-def haspi(aided, clean, sr, audiogram, cap_s=8.0):
-    """HASPI v2 (Kates & Arehart) intelligibility (0-1) -- a hearing-aid-specific metric that models
-    the impaired periphery from the audiogram (so even clean-vs-clean scores below 1 under a loss).
-    Reference = clean (unamplified), processed = aided. Heavy (auditory model); analysed on the first
-    `cap_s` s, where the score is already stable. Requires the vendored HASPI package + numba."""
+def _prep_haspi(aided, clean, sr, audiogram, cap_s=8.0):
+    """Shared front-end for HASPI/HASQI/HAAQI: cap length, calibrate to HASPI's convention
+    (RMS=1 <-> level1 (65) dB SPL -- our clips sit at ~-35 dBFS, so scale the CLEAN reference to
+    RMS=1 and apply the SAME scale to the processed, keeping the aid's gain), build the Audiogram."""
     import haspi_vendor as H
     n = int(cap_s * sr)
     clean = np.asarray(clean, float); aided = np.asarray(aided, float)
-    # HASPI calibration: RMS=1 <-> level1 (65) dB SPL. Our clips sit at ~-35 dBFS, so scale the CLEAN
-    # reference to RMS=1 (= 65 dB SPL) and apply the SAME scale to the processed (keeps the aid's gain).
     scale = 1.0 / (np.sqrt(np.mean(clean ** 2)) + 1e-12)
     ref = clean[:n] * scale
     proc = aided[:n] * scale
@@ -51,29 +48,54 @@ def haspi(aided, clean, sr, audiogram, cap_s=8.0):
     hl = np.interp(np.log10(_HASPI_FREQS), np.log10(af), [audiogram[k] for k in af],
                    left=audiogram[af[0]], right=audiogram[af[-1]])
     ag = H.Audiogram(levels=np.asarray(hl, float), frequencies=np.asarray(_HASPI_FREQS))
-    score, _ = H.haspi_v2(ref, sr, proc, sr, ag, level1=65.0)
-    return round(float(score), 2)
+    return H, ref, proc, ag
 
 
-def all_metrics(aided, clean, sr, audiogram, full=False):
-    """dict(sii, stoi, err[, haspi]) for one clip, rounded for display. `full=True` adds HASPI
-    (offline only -- needs numba, so callers in the Pyodide tool leave it False)."""
+def haspi(aided, clean, sr, audiogram, cap_s=8.0):
+    """HASPI v2 (Kates & Arehart) intelligibility (0-1) -- hearing-aid-specific: models the impaired
+    periphery from the audiogram (so even clean-vs-clean scores below 1 under a loss). Heavy auditory
+    model; analysed on the first `cap_s` s (stable). Requires the vendored package + numba."""
+    H, ref, proc, ag = _prep_haspi(aided, clean, sr, audiogram, cap_s)
+    return round(float(H.haspi_v2(ref, sr, proc, sr, ag, level1=65.0)[0]), 2)
+
+
+def hasqi(aided, clean, sr, audiogram, cap_s=8.0):
+    """HASQI v2 (Kates & Arehart) speech QUALITY (0-1), NAL-R-equalised reference (equalisation=1)."""
+    H, ref, proc, ag = _prep_haspi(aided, clean, sr, audiogram, cap_s)
+    return round(float(H.hasqi_v2(ref, sr, proc, sr, ag, 1, 65.0)[0]), 2)
+
+
+def haaqi(aided, clean, sr, audiogram, cap_s=8.0):
+    """HAAQI v1 (Kates & Arehart) MUSIC quality (0-1) -- the audio/music analog of HASQI."""
+    H, ref, proc, ag = _prep_haspi(aided, clean, sr, audiogram, cap_s)
+    return round(float(H.haaqi_v1(ref, sr, proc, sr, ag, 1, 65.0)[0]), 2)
+
+
+def all_metrics(aided, clean, sr, audiogram, full=False, music=False):
+    """dict(sii, stoi, err[, haspi, hasqi | haaqi]) for one clip, rounded for display. `full=True`
+    adds the hearing-aid-specific metrics (offline only -- need numba, so the Pyodide tool leaves it
+    False): HASPI + HASQI for speech, or HAAQI (music quality) when `music=True`."""
     import speech_resynth as sp
     import stoi_vendor
     out = dict(sii=round(float(sp.official_sii(aided, clean, sr, audiogram)), 2),
                stoi=round(float(stoi_vendor.stoi(clean, aided, sr)), 2),
                err=round(fit_error_db(aided, clean, sr, audiogram), 1))
     if full:
-        out["haspi"] = haspi(aided, clean, sr, audiogram)
+        if music:
+            out["haaqi"] = haaqi(aided, clean, sr, audiogram)
+        else:
+            out["haspi"] = haspi(aided, clean, sr, audiogram)
+            out["hasqi"] = hasqi(aided, clean, sr, audiogram)
     return out
 
 
-def poorer_ear_metrics(stereo, clean, sr, ag_l, ag_r, full=False):
-    """Binaural: metrics of the poorer ear -- min SII/STOI/HASPI, max (worst) dB-to-target."""
-    L = all_metrics(stereo[:, 0], clean, sr, ag_l, full=full)
-    R = all_metrics(stereo[:, 1], clean, sr, ag_r, full=full)
+def poorer_ear_metrics(stereo, clean, sr, ag_l, ag_r, full=False, music=False):
+    """Binaural: metrics of the poorer ear -- min SII/STOI/HASPI/HASQI/HAAQI, max (worst) dB-to-target."""
+    L = all_metrics(stereo[:, 0], clean, sr, ag_l, full=full, music=music)
+    R = all_metrics(stereo[:, 1], clean, sr, ag_r, full=full, music=music)
     out = dict(sii=min(L["sii"], R["sii"]), stoi=min(L["stoi"], R["stoi"]),
                err=max(L["err"], R["err"]), l=L, r=R)        # keep per-ear too, for display
-    if full:
-        out["haspi"] = min(L["haspi"], R["haspi"])
+    for k in ("haspi", "hasqi", "haaqi"):
+        if k in L and k in R:
+            out[k] = min(L[k], R[k])
     return out

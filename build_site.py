@@ -17,6 +17,7 @@ A = json.load(open(os.path.join(HERE, "assets.json")))
 S = json.load(open(os.path.join(HERE, "subjects.json")))
 O = json.load(open(os.path.join(HERE, "openmha_section.json")))
 SO = json.load(open(os.path.join(HERE, "subjects_openmha.json")))
+N = json.load(open(os.path.join(HERE, "noise_section.json")))
 
 BLURB = {
     "sloping":  "Gentle high-frequency slope; near-normal lows.",
@@ -52,22 +53,26 @@ def transport(cur_label):
       <p class="cue"><span class="dot"></span><b class="cur">{cur_label}</b><span class="hint">{{hint}}</span></p>"""
 
 
-def metric_rows(items, sii_label="ANSI SII (0–1)"):     # items: [(name, {sii, stoi, err}), ...]
+def metric_rows(items, sii_label="ANSI SII (0–1)"):     # items: [(name, {sii, stoi, err, ...}), ...]
+    f2 = lambda v: f"{v:.2f}"; f0 = lambda v: f"{v:.0f}"
+    def has(key): return any(m.get(key) is not None for _, m in items)
     def row(lab, key, fmt):
         cells = "  &middot;  ".join(
             (f"{html.escape(n)} {fmt(m[key])}" if m.get(key) is not None else f"{html.escape(n)} –")
             for n, m in items)
         return f"<div><b>{lab}:</b> {cells}</div>"
-    return ('<div class="siirow">'
-            + row(sii_label, "sii", lambda v: f"{v:.2f}")
-            + row("STOI (0–1)", "stoi", lambda v: f"{v:.2f}")
-            + row("HASPI (0–1)", "haspi", lambda v: f"{v:.2f}")
-            + row("dB RMS to NAL-NL2 ref", "err", lambda v: f"{v:.0f}")
-            + '<div class="metleg">SII / STOI / <b>HASPI</b>: higher = better. <b>HASPI</b> (Kates &amp; Arehart) is '
-              'hearing&#8209;aid&#8209;specific &mdash; it models the impaired ear from the audiogram, so even a perfect '
-              'clip scores below 1 under a loss. dB&#8209;to&#8209;ref measures each fit\'s shaping against one common '
-              'yardstick (the NAL&#8209;NL2 prescription), so NAL&#8209;NL2 sits near 0 by design and the others show how '
-              'far they differ (not worse).</div>'
+    out = row(sii_label, "sii", f2) + row("STOI (0–1)", "stoi", f2)
+    if has("haspi"): out += row("HASPI intelligibility (0–1)", "haspi", f2)
+    if has("hasqi"): out += row("HASQI quality (0–1)", "hasqi", f2)
+    if has("haaqi"): out += row("HAAQI music quality (0–1)", "haaqi", f2)
+    out += row("dB RMS to NAL-NL2 ref", "err", f0)
+    return ('<div class="siirow">' + out
+            + '<div class="metleg">All 0&#8209;1 scores: higher = better. <b>HASPI</b>/<b>HASQI</b> (intelligibility / '
+              'quality) and <b>HAAQI</b> (music quality) are hearing&#8209;aid&#8209;specific (Kates &amp; Arehart) &mdash; '
+              'they model the impaired ear from the audiogram, so even a perfect clip scores below 1 under a loss (and '
+              'they spread out most in noise). dB&#8209;to&#8209;ref measures each fit\'s shaping against one common yardstick '
+              '(the NAL&#8209;NL2 prescription), so NAL&#8209;NL2 sits near 0 by design and the others show how far they differ '
+              '(not worse).</div>'
             + '</div>')
 
 
@@ -195,6 +200,34 @@ def subj_omha_section(a):                               # binaural subject: ours
     </section>"""
 
 
+def noise_section(n):                                   # the same fits, on speech in babble noise
+    audios, chips = [], []
+    for i, c in enumerate(n["conditions"]):
+        audios.append(f'<audio data-i="{i}" preload="none" src="{c["file"]}"></audio>')
+        pressed = "true" if i == 0 else "false"
+        chips.append(f'<button class="chip c-{c["cls"]}" data-i="{i}" aria-pressed="{pressed}">'
+                     f'{html.escape(c["label"])}<em>{html.escape(c["sub"])}</em></button>')
+    hint = "&mdash; loudness-matched; in quiet these metrics saturate, in noise they separate"
+    srow = metric_rows([(c["label"], c) for c in n["conditions"]])
+    return f"""
+    <section class="specimen" id="st-noise" data-player>
+      <div class="sp-head"><span class="sp-num sub">&#9670;</span>
+        <div class="sp-title"><h2>The same fits, in noise <span class="kind">+{n['snr']:.0f} dB babble</span></h2>
+        <p class="sp-blurb">The clinical fits on speech in <b>+{n['snr']:.0f}&nbsp;dB SNR babble</b> ({html.escape(n['name'])}),
+        each scored against the clean reference. This is where the hearing-aid metrics earn their keep:
+        in quiet HASPI/STOI sit near 1, but <b>in noise they clearly separate the fits</b> (and HASQI stays
+        low &mdash; noise caps quality no matter the gain).</p></div></div>
+      <figure class="paper omfig"><img alt="Audiogram, {html.escape(n['name'])}"
+        src="data:image/png;base64,{n['png']}"><figcaption>Audiogram</figcaption></figure>
+      <div class="console"><div class="chips">{chips[0]}<span class="sep"></span>
+        <span class="ramp">{''.join(chips[1:])}</span></div>
+        {transport('Original').format(hint=hint)}
+        {srow}</div>
+      <div class="audio-pool" hidden>{''.join(audios)}</div>
+    </section>"""
+
+
+NOISE = noise_section(N)
 SUBJ_OMHA = "\n".join(subj_omha_section(x) for x in SO["subjects"])
 SUBJECTS = "\n".join(subject_section(s) for s in S["subjects"] if s["id"] != "ild")
 ILD = "\n".join(subject_section(s) for s in S["subjects"] if s["id"] == "ild")
@@ -591,6 +624,7 @@ footer .warn{{border-left:2px solid var(--amber);padding-left:12px;margin-top:14
     <h3 class="mt">Ours vs OpenMHA</h3>
     <nav>{RAIL_OMHA}</nav>
     <nav>{RAIL_SUBJ_OMHA}</nav>
+    <nav><a href="#st-noise" data-spy="st-noise"><span>&#9670;</span>The same fits, in noise</a></nav>
     <div class="key">
       <div class="r"><span class="sw" style="background:var(--amber)"></span><b>Original</b>&nbsp;unaided</div>
       <div class="r"><span class="sw" style="background:var(--red)"></span><b>Right</b>&nbsp;ear fit</div>
@@ -612,6 +646,8 @@ footer .warn{{border-left:2px solid var(--amber);padding-left:12px;margin-top:14
 {OMHA}
     <p class="band-label">Subjects vs OpenMHA &mdash; binaural, each ear fit on its own audiogram</p>
 {SUBJ_OMHA}
+    <p class="band-label">In noise &mdash; where the hearing-aid metrics separate the fits</p>
+{NOISE}
 {TOOL_HTML}
   </main>
 </div>
