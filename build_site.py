@@ -18,6 +18,7 @@ S = json.load(open(os.path.join(HERE, "subjects.json")))
 O = json.load(open(os.path.join(HERE, "openmha_section.json")))
 SO = json.load(open(os.path.join(HERE, "subjects_openmha.json")))
 N = json.load(open(os.path.join(HERE, "noise_section.json")))
+E = json.load(open(os.path.join(HERE, "enhance_section.json")))
 
 BLURB = {
     "sloping":  "Gentle high-frequency slope; near-normal lows.",
@@ -61,11 +62,13 @@ def metric_rows(items, sii_label="ANSI SII (0–1)"):     # items: [(name, {sii,
             (f"{html.escape(n)} {fmt(m[key])}" if m.get(key) is not None else f"{html.escape(n)} –")
             for n, m in items)
         return f"<div><b>{lab}:</b> {cells}</div>"
-    out = row(sii_label, "sii", f2) + row("STOI (0–1)", "stoi", f2)
+    out = ""
+    if has("sii"): out += row(sii_label, "sii", f2)
+    if has("stoi"): out += row("STOI (0–1)", "stoi", f2)
     if has("haspi"): out += row("HASPI intelligibility (0–1)", "haspi", f2)
     if has("hasqi"): out += row("HASQI quality (0–1)", "hasqi", f2)
     if has("haaqi"): out += row("HAAQI music quality (0–1)", "haaqi", f2)
-    out += row("dB RMS to NAL-NL2 ref", "err", f0)
+    if has("err"): out += row("dB RMS to NAL-NL2 ref", "err", f0)
     return ('<div class="siirow">' + out
             + '<div class="metleg">All 0&#8209;1 scores: higher = better. <b>HASPI</b>/<b>HASQI</b> (intelligibility / '
               'quality) and <b>HAAQI</b> (music quality) are hearing&#8209;aid&#8209;specific (Kates &amp; Arehart) &mdash; '
@@ -227,7 +230,61 @@ def noise_section(n):                                   # the same fits, on spee
     </section>"""
 
 
+def _chips_audios(conditions):
+    audios, chips = [], []
+    for i, c in enumerate(conditions):
+        audios.append(f'<audio data-i="{i}" preload="none" src="{c["file"]}"></audio>')
+        pressed = "true" if i == 0 else "false"
+        chips.append(f'<button class="chip c-{c["cls"]}" data-i="{i}" aria-pressed="{pressed}">'
+                     f'{html.escape(c["label"])}<em>{html.escape(c["sub"])}</em></button>')
+    return chips, audios
+
+
+def enhance_speech_section(e):                          # offline denoising CEILING (oracle mask)
+    chips, audios = _chips_audios(e["conditions"])
+    hint = "&mdash; loudness-matched; the oracle uses the clean signal, so it's an upper bound, not achievable live"
+    srow = metric_rows([(c["label"], c) for c in e["conditions"]])
+    return f"""
+    <section class="specimen" id="st-enh-sp" data-player>
+      <div class="sp-head"><span class="sp-num sub">&#9670;</span>
+        <div class="sp-title"><h2>Denoising ceiling <span class="kind">offline &middot; oracle</span></h2>
+        <p class="sp-blurb">How much headroom is left in noise reduction? The <b>oracle mask</b> is built from
+        the <b>clean</b> signal (impossible in a real aid), so it's the <b>upper bound</b> a good DNN denoiser
+        could chase. The gap from the blind spectral&#8209;Wiener denoiser to the oracle is that headroom
+        (HASPI here jumps from ~0.55 to ~0.9).</p></div></div>
+      <figure class="paper omfig"><img alt="Audiogram" src="data:image/png;base64,{e['png']}"><figcaption>Audiogram</figcaption></figure>
+      <div class="console"><div class="chips">{chips[0]}<span class="sep"></span>
+        <span class="ramp">{''.join(chips[1:])}</span></div>
+        {transport('Noisy').format(hint=hint)}
+        {srow}</div>
+      <div class="audio-pool" hidden>{''.join(audios)}</div>
+    </section>"""
+
+
+def enhance_music_section(e):                           # music-specific: harmonic/percussive separation
+    chips, audios = _chips_audios(e["conditions"])
+    hint = "&mdash; headphones; hear the tonal and rhythmic layers pulled apart"
+    srow = metric_rows([(c["label"], c) for c in e["conditions"]], "")
+    return f"""
+    <section class="specimen subject" id="st-enh-mus" data-player>
+      <div class="sp-head"><span class="sp-num sub">&#9670;</span>
+        <div class="sp-title"><h2>Music &mdash; harmonic / percussive separation <span class="kind">offline &middot; HPSS</span>
+        <span class="badge">placeholder music</span></h2>
+        <p class="sp-blurb">A music&#8209;specific offline technique: median&#8209;filter the spectrogram to split the
+        <b>harmonic</b> (tonal &mdash; melody &amp; harmony) from the <b>percussive</b> (transient &mdash; rhythm) layers,
+        then rebalance. Emphasising the harmonic layer can aid tonal clarity for a high&#8209;frequency loss; scored with
+        <b>HAAQI</b> (music quality).</p></div></div>
+      <div class="console"><div class="chips">{chips[0]}<span class="sep"></span>
+        <span class="ramp">{''.join(chips[1:])}</span></div>
+        {transport('Original').format(hint=hint)}
+        {srow}</div>
+      <div class="audio-pool" hidden>{''.join(audios)}</div>
+    </section>"""
+
+
 NOISE = noise_section(N)
+ENH_SP = enhance_speech_section(E["speech"])
+ENH_MUS = enhance_music_section(E["music"])
 SUBJ_OMHA = "\n".join(subj_omha_section(x) for x in SO["subjects"])
 SUBJECTS = "\n".join(subject_section(s) for s in S["subjects"] if s["id"] != "ild")
 ILD = "\n".join(subject_section(s) for s in S["subjects"] if s["id"] == "ild")
@@ -625,6 +682,9 @@ footer .warn{{border-left:2px solid var(--amber);padding-left:12px;margin-top:14
     <nav>{RAIL_OMHA}</nav>
     <nav>{RAIL_SUBJ_OMHA}</nav>
     <nav><a href="#st-noise" data-spy="st-noise"><span>&#9670;</span>The same fits, in noise</a></nav>
+    <h3 class="mt">Offline ceilings</h3>
+    <nav><a href="#st-enh-sp" data-spy="st-enh-sp"><span>&#9670;</span>Denoising ceiling</a>
+      <a href="#st-enh-mus" data-spy="st-enh-mus"><span>&#9670;</span>Music &middot; HPSS</a></nav>
     <div class="key">
       <div class="r"><span class="sw" style="background:var(--amber)"></span><b>Original</b>&nbsp;unaided</div>
       <div class="r"><span class="sw" style="background:var(--red)"></span><b>Right</b>&nbsp;ear fit</div>
@@ -648,6 +708,9 @@ footer .warn{{border-left:2px solid var(--amber);padding-left:12px;margin-top:14
 {SUBJ_OMHA}
     <p class="band-label">In noise &mdash; where the hearing-aid metrics separate the fits</p>
 {NOISE}
+    <p class="band-label">Offline enhancement &mdash; research ceilings, not a live aid</p>
+{ENH_SP}
+{ENH_MUS}
 {TOOL_HTML}
   </main>
 </div>
