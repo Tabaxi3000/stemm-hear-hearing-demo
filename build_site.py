@@ -310,6 +310,7 @@ TOOL_CSS = """
   border-radius:9px;padding:8px 14px;cursor:pointer;transition:transform .06s}
 .filebtn:hover{transform:translateY(-1px)} .filebtn input{display:none}
 .fname{font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:10px}
+.fnote{font-family:var(--mono);font-size:10.5px;color:var(--amber);margin-left:6px}
 .presets{font-size:11px;color:var(--muted);margin:16px 0 8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-family:var(--mono)}
 .presets button{font-family:var(--mono);font-size:11px;border:1px solid var(--line);background:transparent;color:var(--ink-2);
   border-radius:6px;padding:3px 8px;cursor:pointer}
@@ -405,7 +406,7 @@ TOOL_HTML = f"""
         the first run downloads ~30&nbsp;MB and falls back to a JS approximation if that can't load. Nothing is
         uploaded &mdash; it all runs on your machine.</p></div></div>
       <p class="quickstart"><b>Quick start:</b> pick an audiogram preset (or drag the sliders) &rarr;
-        <b>Choose audio</b> &rarr; <b>Process</b>, then click the tabs to A/B. Set your volume so <b>Original</b>
+        <b>Choose audio</b> (any format; up to <b>30&nbsp;s</b>, downmixed to mono at 32&nbsp;kHz) &rarr; <b>Process</b>, then click the tabs to A/B. Set your volume so <b>Original</b>
         is comfortable &mdash; it's presented at ~65&nbsp;dB&nbsp;SPL (normal conversation), and the fits lift it
         from there. SII numbers are the <b>official ANSI S3.5</b> index. (The gallery sections above also
         report <b>HASPI</b>, a hearing-aid-specific metric; it runs an auditory model, too heavy for the
@@ -413,7 +414,7 @@ TOOL_HTML = f"""
       <div class="tool-grid">
         <div class="panel">
           <label class="filebtn">Choose audio<input type="file" id="tf" accept="audio/*"></label>
-          <span id="fname" class="fname">no file chosen yet</span>
+          <span id="fname" class="fname">no file chosen yet</span><span id="fnote" class="fnote"></span>
           <div class="presets">audiogram preset:
             <button data-preset="normal">normal</button><button data-preset="sloping">sloping</button>
             <button data-preset="flat">flat 40</button><button data-preset="ski">ski-slope</button>

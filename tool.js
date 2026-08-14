@@ -8,7 +8,7 @@
   var ag = [20, 25, 30, 40, 55, 65];                   // left ear (also the mono audiogram)
   var agR = ag.slice();                                // right ear (used only in binaural mode)
   var binauralOn = false, binaEverOn = false;
-  var SR = 32000, CAP = 10;                            // process up to 10 s (each fit is a full DSP pass)
+  var SR = 32000, CAP = 30;                            // process up to 30 s (each fit is a full DSP pass; time scales with length)
   var input = null, fileName = "", urls = {}, clips = {};
   var KEYS = ["original", "static", "wdrc", "rx", "nal", "dsl", "cam", "per"], specCache = {};
   var LABELS = ["Original", "Static", "WDRC", "Rx", "NAL-NL2", "DSL", "CAM2", "Personalized"];
@@ -255,6 +255,13 @@
         off.startRendering().then(function (r) {
           input = r.getChannelData(0).slice(0, len); ac.close();
           fileName = file.name; $("fname").textContent = file.name + "  (" + (len / SR).toFixed(1) + " s)";
+          if ($("fnote")) {                                // notices: truncation + stereo downmix
+            var notes = [];
+            if (buf.duration > CAP + 0.05) notes.push("using the first " + CAP + " s of " + buf.duration.toFixed(1) + " s");
+            if (buf.numberOfChannels > 1) notes.push("downmixed to mono");
+            notes.push("resampled to 32 kHz");
+            $("fnote").textContent = "— " + notes.join(" · ");
+          }
           status("ready — press Process"); $("run").disabled = false;
         });
       }, function () { status("couldn't decode that file — try a WAV or MP3"); ac.close(); });
