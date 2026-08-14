@@ -509,7 +509,7 @@ TOOL_HTML = f"""
           <button id="blindbtn" class="blindstart" disabled>Blind A/B preference test</button>
           <div class="blind" id="blindpanel" style="display:none">
             <div class="blindhdr">Blind A/B &mdash; two unlabeled <b>fits</b>, pick the one you prefer &middot; trial <b id="btrial">1</b> <span id="btally"></span>
-              <span class="bframe">This compares <b>fits only</b>: the audiogram, level, noise and any processing are identical for A and B, so your choice isolates the fitting. (Enhancement / noise reduction is a separate experiment &mdash; don't mix them into one A/B.)</span></div>
+              <span class="bframe">This compares <b>fits only</b>: the audiogram, level, noise and any processing are identical for A and B, so your choice isolates the fitting. (Enhancement / noise reduction is a separate experiment &mdash; don't mix them into one A/B.) Which fit is winning stays <b>hidden until you press &ldquo;done&rdquo;</b>, so it can't sway you mid&#8209;test.</span></div>
             <div class="blindctl">
               <button id="bA" class="bbtn">&#9654;&nbsp;A</button><button id="bB" class="bbtn">&#9654;&nbsp;B</button>
               <span class="bsep"></span>

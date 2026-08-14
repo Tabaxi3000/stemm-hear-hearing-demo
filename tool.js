@@ -407,7 +407,7 @@
       mA: fitMetrics[blind.A] || null, mB: fitMetrics[blind.B] || null,   // objective metrics of each clip
       commentA: "", commentB: "", audiogram: ag.join("/"), level: o.spl, noise: o.noise,
       ntype: o.ntype, reverb: o.rev, nr: o.nr, prog: o.prog, binaural: binauralOn };
-    blind.trials.push(blind.cur); blindSave(); blindTally();
+    blind.trials.push(blind.cur); blindSave();             // NB: no results shown mid-session (would de-blind)
     // stay fully blind on screen: never name the fits to the listener (identities live in the CSV only)
     $("breveal").innerHTML = "You chose <b>" + which + "</b>. Trial " + blind.n + " logged (" +
       blind.trials.length + " total) &mdash; add notes below, then continue.";
@@ -416,8 +416,8 @@
     blindPrefBtns(true);                                  // lock the choice; play buttons stay live for re-listening
     if ($("bcommentA")) $("bcommentA").focus();
   }
-  // Live results (identities revealed here, in the analysis view — never during a trial): win rate per
-  // fit, and how often preference agreed with the higher-SII clip (does taste track the objective metric?).
+  // Results are shown ONLY when the session is ended (see blindDone) — never between trials, since
+  // seeing which named fit is winning would de-blind the listener and bias later votes.
   function blindTally() {
     var el = $("bresults"); if (!el) return;
     if (!blind.trials.length) { el.innerHTML = ""; return; }
@@ -453,6 +453,14 @@
     var url = URL.createObjectURL(new Blob([body], { type: "text/csv" }));
     var a = document.createElement("a"); a.href = url; a.download = "blind_ab_" + Date.now() + ".csv"; a.click();
   }
+  function blindDone() {                                  // end the session: NOW reveal results + export
+    if (!blind.trials.length) { blindCSV(); return; }
+    blindTally();                                         // reveal the per-fit tally (safe: no more trials)
+    blindCSV();
+    blindPrefBtns(true); if ($("bnext")) $("bnext").disabled = true;   // lock trial controls -> session over
+    if ($("bcomment")) $("bcomment").style.display = "none";
+    $("breveal").innerHTML = "Session ended &mdash; results below, CSV downloaded. Reload the page to start a fresh blind session.";
+  }
 
   // ---- init --------------------------------------------------------------------------
   document.addEventListener("DOMContentLoaded", function () {
@@ -473,7 +481,7 @@
     blind.ba = new Audio(); blind.bb = new Audio();
     try { var _sv = JSON.parse(localStorage.getItem("blind_ab") || "[]"); if (_sv.length) blind.trials = _sv; } catch (e) {}
     if ($("blindbtn")) $("blindbtn").addEventListener("click", function () {
-      $("blindpanel").style.display = "block"; $("blindbtn").style.display = "none"; blindNext(); blindTally(); });
+      $("blindpanel").style.display = "block"; $("blindbtn").style.display = "none"; blindNext(); });
     if ($("bA")) $("bA").addEventListener("click", function () { blindPlay("A"); });
     if ($("bB")) $("bB").addEventListener("click", function () { blindPlay("B"); });
     if ($("bprefA")) $("bprefA").addEventListener("click", function () { blindPrefer("A"); });
@@ -482,7 +490,7 @@
     if ($("bnext")) $("bnext").addEventListener("click", blindNext);
     if ($("bcommentA")) $("bcommentA").addEventListener("input", function () { if (blind.cur) { blind.cur.commentA = $("bcommentA").value; blindSave(); } });
     if ($("bcommentB")) $("bcommentB").addEventListener("input", function () { if (blind.cur) { blind.cur.commentB = $("bcommentB").value; blindSave(); } });
-    if ($("bdone")) $("bdone").addEventListener("click", blindCSV);
+    if ($("bdone")) $("bdone").addEventListener("click", blindDone);
     pool.forEach(function (a) { a.addEventListener("ended", function () { setOn(false);
       pool.forEach(function (x) { x.currentTime = 0; }); $("tfill").style.width = "0%"; $("tseek").value = 0; }); });
     $("tplay").addEventListener("click", function () { if (!pool[active].src) return;
