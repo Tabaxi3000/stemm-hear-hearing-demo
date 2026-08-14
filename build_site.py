@@ -373,6 +373,9 @@ TOOL_CSS = """
 .blindstart:hover:not(:disabled){border-color:var(--teal);color:var(--teal)} .blindstart:disabled{opacity:.45;cursor:default}
 .blind{margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
 .blindhdr{font-size:12.5px;color:var(--ink-2);margin-bottom:12px} .blindhdr b{color:var(--ink)}
+.bframe{display:block;font-size:10.5px;color:var(--muted);line-height:1.5;margin-top:5px}
+.bresults{font-family:var(--mono);font-size:11px;color:var(--ink-2);line-height:1.7;margin:10px 0;
+  padding-top:9px;border-top:1px dashed var(--line)} .bresults:empty{display:none} .bresults b{color:var(--teal)}
 .blindctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .bbtn{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--ink);background:var(--surface);border:1.5px solid var(--line);border-radius:9px;padding:7px 13px;cursor:pointer}
 .bbtn:hover{border-color:var(--teal)} .bbtn.pref{color:#fff;background:var(--teal);border-color:transparent}
@@ -505,7 +508,8 @@ TOOL_HTML = f"""
             <a id="dl_cam" class="dl">cam2.wav</a><a id="dl_per" class="dl">personalized.wav</a></div>
           <button id="blindbtn" class="blindstart" disabled>Blind A/B preference test</button>
           <div class="blind" id="blindpanel" style="display:none">
-            <div class="blindhdr">Blind A/B &mdash; two unlabeled fits, pick the one you prefer &middot; trial <b id="btrial">1</b> <span id="btally"></span></div>
+            <div class="blindhdr">Blind A/B &mdash; two unlabeled <b>fits</b>, pick the one you prefer &middot; trial <b id="btrial">1</b> <span id="btally"></span>
+              <span class="bframe">This compares <b>fits only</b>: the audiogram, level, noise and any processing are identical for A and B, so your choice isolates the fitting. (Enhancement / noise reduction is a separate experiment &mdash; don't mix them into one A/B.)</span></div>
             <div class="blindctl">
               <button id="bA" class="bbtn">&#9654;&nbsp;A</button><button id="bB" class="bbtn">&#9654;&nbsp;B</button>
               <span class="bsep"></span>
@@ -519,7 +523,8 @@ TOOL_HTML = f"""
                 <textarea id="bcommentB" rows="2" placeholder="what stood out on B, and what decided it?"></textarea></label>
               <button id="bnext" class="bbtn pref">save &amp; next trial &rarr;</button>
             </div>
-            <button id="bdone" class="bbtn done">done &mdash; download CSV</button>
+            <div id="bresults" class="bresults"></div>
+            <button id="bdone" class="bbtn done">done &mdash; download CSV (with each clip's SII / STOI / dB-to-target)</button>
           </div>
         </div>
       </div>

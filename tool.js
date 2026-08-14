@@ -337,13 +337,15 @@
         var mn = function (a, b) { return a && b ? a.map(function (v, i) { return Math.min(v, b[i]); }) : null; };
         var mx = function (a, b) { return a && b ? a.map(function (v, i) { return Math.max(v, b[i]); }) : null; };
         applyClips();
+        var pSII = mn(L.sii, R.sii), pSTOI = mn(L.stoi, R.stoi), pERR = mx(L.err, R.err);
+        storeFitMetrics(pSII, pSTOI, pERR);                // poorer-ear metrics per fit, for the blind CSV
         var brows = [                                      // show BOTH ears' SII; STOI/dB on the poorer ear
           { label: "ANSI SII &mdash; left ear:", vals: L.sii, fmt: FMT2 },
           { label: "ANSI SII &mdash; right ear:", vals: R.sii, fmt: FMT2 },
-          { label: "STOI (poorer ear):", vals: mn(L.stoi, R.stoi), fmt: FMT2 },
-          { label: "dB to NAL-NL2 ref (poorer ear):", vals: mx(L.err, R.err), fmt: FMT0 }
+          { label: "STOI (poorer ear):", vals: pSTOI, fmt: FMT2 },
+          { label: "dB to NAL-NL2 ref (poorer ear):", vals: pERR, fmt: FMT0 }
         ];
-        finishUp(brows, makeVerdict(mn(L.sii, R.sii), mn(L.stoi, R.stoi), mx(L.err, R.err)),
+        finishUp(brows, makeVerdict(pSII, pSTOI, pERR),
                  "done — binaural, each ear fit on its own audiogram (headphones); SII shown per ear");
         return;
       }
@@ -357,6 +359,7 @@
         KEYS.slice(1).forEach(function (k) { clips[k] = r[k] ? normalize(r[k], -20) : null; });
       }
       applyClips();
+      storeFitMetrics(r.sii, r.stoi, r.err);               // per-fit metrics, for the blind CSV
       var mrows = r.sii ? [
         { label: "ANSI SII (0–1):", vals: r.sii, fmt: FMT2 },
         { label: "STOI (0–1):", vals: r.stoi, fmt: FMT2 },
@@ -371,6 +374,14 @@
   // ---- blind A/B preference test -----------------------------------------------------
   var blind = { A: null, B: null, trials: [], ba: null, bb: null, n: 0, cur: null };
   var LAB = {}; KEYS.forEach(function (k, i) { LAB[k] = LABELS[i]; });
+  var fitMetrics = {};                                    // last run's per-fit {sii, stoi, err}, for the CSV
+  function storeFitMetrics(si, st, er) {
+    fitMetrics = {};
+    if (!si) return;
+    KEYS.forEach(function (k, i) { fitMetrics[k] = { sii: si[i], stoi: st ? st[i] : null, err: er ? er[i] : null }; });
+  }
+  function m2(v) { return v == null ? "" : v.toFixed(2); }
+  function m0(v) { return v == null ? "" : v.toFixed(0); }
   function blindPrefBtns(disabled) {
     ["bprefA", "bprefB", "bskip"].forEach(function (id) { if ($(id)) $(id).disabled = disabled; });
   }
@@ -393,9 +404,10 @@
     if (blind.cur) return;                                // already chose this trial; use "save & next"
     var win = which === "A" ? blind.A : blind.B, lose = which === "A" ? blind.B : blind.A, o = opts();
     blind.cur = { trial: blind.n, clipA: blind.A, clipB: blind.B, prefer: win, over: lose,
+      mA: fitMetrics[blind.A] || null, mB: fitMetrics[blind.B] || null,   // objective metrics of each clip
       commentA: "", commentB: "", audiogram: ag.join("/"), level: o.spl, noise: o.noise,
       ntype: o.ntype, reverb: o.rev, nr: o.nr, prog: o.prog, binaural: binauralOn };
-    blind.trials.push(blind.cur); blindSave();
+    blind.trials.push(blind.cur); blindSave(); blindTally();
     // stay fully blind on screen: never name the fits to the listener (identities live in the CSV only)
     $("breveal").innerHTML = "You chose <b>" + which + "</b>. Trial " + blind.n + " logged (" +
       blind.trials.length + " total) &mdash; add notes below, then continue.";
@@ -404,16 +416,38 @@
     blindPrefBtns(true);                                  // lock the choice; play buttons stay live for re-listening
     if ($("bcommentA")) $("bcommentA").focus();
   }
+  // Live results (identities revealed here, in the analysis view — never during a trial): win rate per
+  // fit, and how often preference agreed with the higher-SII clip (does taste track the objective metric?).
+  function blindTally() {
+    var el = $("bresults"); if (!el) return;
+    if (!blind.trials.length) { el.innerHTML = ""; return; }
+    var seen = {}, won = {}, agree = 0, scored = 0;
+    blind.trials.forEach(function (t) {
+      [t.clipA, t.clipB].forEach(function (k) { seen[k] = (seen[k] || 0) + 1; });
+      won[t.prefer] = (won[t.prefer] || 0) + 1;
+      if (t.mA && t.mB && t.mA.sii != null && t.mA.sii !== t.mB.sii) {
+        scored++; var hi = t.mA.sii > t.mB.sii ? t.clipA : t.clipB; if (hi === t.prefer) agree++;
+      }
+    });
+    var order = Object.keys(seen).sort(function (a, b) { return (won[b] || 0) / seen[b] - (won[a] || 0) / seen[a]; });
+    var rows = order.map(function (k) {
+      return LAB[k] + " <b>" + (won[k] || 0) + "/" + seen[k] + "</b>";
+    }).join(" &middot; ");
+    var ag = scored ? " &mdash; preferred the higher-SII clip in <b>" + agree + "/" + scored + "</b> scored trials" : "";
+    el.innerHTML = "<b>Results</b> (wins/seen): " + rows + ag;
+  }
   function blindSave() { try { localStorage.setItem("blind_ab", JSON.stringify(blind.trials)); } catch (e) {} }
   function csvCell(v) { v = (v == null ? "" : String(v)); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
   function blindCSV() {
-    var cols = ["trial", "clipA", "clipB", "preferred", "over", "comment_A", "comment_B",
-      "audiogram", "level_dB", "noise_SNR", "noise_type", "reverb", "NR", "program", "binaural"];
+    var cols = ["trial", "clipA", "clipB", "preferred", "over",
+      "A_SII", "A_STOI", "A_dB_to_NAL", "B_SII", "B_STOI", "B_dB_to_NAL",
+      "comment_A", "comment_B", "audiogram", "level_dB", "noise_SNR", "noise_type", "reverb", "NR", "program", "binaural"];
     var rows = [cols];
     blind.trials.forEach(function (t) {
-      rows.push([t.trial, LAB[t.clipA] || t.clipA, LAB[t.clipB] || t.clipB, LAB[t.prefer] || t.prefer,
-        LAB[t.over] || t.over, t.commentA, t.commentB, t.audiogram, t.level, t.noise, t.ntype,
-        t.reverb, t.nr, t.prog, t.binaural]);
+      var a = t.mA || {}, b = t.mB || {};
+      rows.push([t.trial, LAB[t.clipA] || t.clipA, LAB[t.clipB] || t.clipB, LAB[t.prefer] || t.prefer, LAB[t.over] || t.over,
+        m2(a.sii), m2(a.stoi), m0(a.err), m2(b.sii), m2(b.stoi), m0(b.err),
+        t.commentA, t.commentB, t.audiogram, t.level, t.noise, t.ntype, t.reverb, t.nr, t.prog, t.binaural]);
     });
     var body = rows.map(function (r) { return r.map(csvCell).join(","); }).join("\r\n");
     var url = URL.createObjectURL(new Blob([body], { type: "text/csv" }));
@@ -439,7 +473,7 @@
     blind.ba = new Audio(); blind.bb = new Audio();
     try { var _sv = JSON.parse(localStorage.getItem("blind_ab") || "[]"); if (_sv.length) blind.trials = _sv; } catch (e) {}
     if ($("blindbtn")) $("blindbtn").addEventListener("click", function () {
-      $("blindpanel").style.display = "block"; $("blindbtn").style.display = "none"; blindNext(); });
+      $("blindpanel").style.display = "block"; $("blindbtn").style.display = "none"; blindNext(); blindTally(); });
     if ($("bA")) $("bA").addEventListener("click", function () { blindPlay("A"); });
     if ($("bB")) $("bB").addEventListener("click", function () { blindPlay("B"); });
     if ($("bprefA")) $("bprefA").addEventListener("click", function () { blindPrefer("A"); });
