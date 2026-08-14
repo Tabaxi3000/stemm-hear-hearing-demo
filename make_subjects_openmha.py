@@ -14,7 +14,7 @@ PROJ = "/Users/tabaxitft/Desktop/STEMM-HEAR/FILTER BANKS/speech_resynthesis"
 OMHA = os.path.join(PROJ, "openmha", "out")
 sys.path.insert(0, os.path.join(PROJ, "colab")); sys.path.insert(0, os.path.join(PROJ, "openmha"))
 sys.path.append(os.path.join(PROJ, "web"))
-import speech_resynth as sp, fitting, metrics
+import speech_resynth as sp, fitting, metrics, buildkit
 SR = 16000
 FC = sp.band_centres(sp.band_edges(100.0, 7200.0, 28, "greenwood"))
 COMMON = dict(backend="stft", n_bands=28, flo=100.0, fhi=7200.0, carrier="original",
@@ -77,6 +77,7 @@ COND = [("original","Original","unaided","orig"), ("ours","Ours (Rx)","our presc
         ("camfit","CAMFIT / CAM2","OpenMHA","cam")]
 
 out = {"subjects": []}
+_bar = buildkit.bar(len(SUBJECTS) * len(COND), "subj-omha")
 for sub in SUBJECTS:
     x65 = SRC[sub["src"]]
     stereo = {"original": np.stack([x65, x65], 1),
@@ -90,7 +91,8 @@ for sub in SUBJECTS:
     p = os.path.join(SC, f"subomha_{sub['id']}.png"); twoear_png(sub, p)
     conds = []
     for cid, lab, s, cl in COND:
-        pm = metrics.poorer_ear_metrics(stereo[cid], x65, SR, sub["aL"], sub["aR"], full=True, music=(sub["src"]=="music"))
+        pm = buildkit.poorer_cached(metrics.poorer_ear_metrics, stereo[cid], x65, SR, sub["aL"], sub["aR"],
+                                    full=True, music=(sub["src"] == "music")); _bar.update()
         _d = dict(id=cid, label=lab, sub=s, cls=cl, sii=pm["sii"], stoi=pm["stoi"], err=pm["err"],
                   file=write_aac(clips[cid], f"subomha_{sub['id']}_{cid}"))
         for _k in ("haspi", "hasqi", "haaqi"):
@@ -99,6 +101,7 @@ for sub in SUBJECTS:
     out["subjects"].append(dict(id=sub["id"], name=sub["name"], kind=sub["kind"],
                                 placeholder=(sub["src"]=="music"), png=png_b64(p), conditions=conds))
     print(f"{sub['name']:12s} SII better-ear:", {c['id']: c['sii'] for c in conds})
+_bar.close(); buildkit.save()
 
 json.dump(out, open(os.path.join(SC, "subjects_openmha.json"), "w"))
 print("wrote subjects_openmha.json  %.3f MB" % (os.path.getsize(os.path.join(SC,"subjects_openmha.json"))/1e6))

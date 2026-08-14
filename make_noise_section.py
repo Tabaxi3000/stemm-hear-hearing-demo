@@ -14,7 +14,7 @@ SC = "/private/tmp/claude-502/-Users-tabaxitft-Desktop-STEMM-HEAR/02cdbe4e-d460-
 PROJ = "/Users/tabaxitft/Desktop/STEMM-HEAR/FILTER BANKS/speech_resynthesis"
 sys.path.insert(0, os.path.join(PROJ, "colab")); sys.path.insert(0, os.path.join(PROJ, "openmha"))
 sys.path.append(os.path.join(PROJ, "web"))
-import speech_resynth as sp, fitting, metrics
+import speech_resynth as sp, fitting, metrics, buildkit
 SR = 16000
 FC = sp.band_centres(sp.band_edges(100.0, 7200.0, 28, "greenwood"))
 COMMON = dict(backend="stft", n_bands=28, flo=100.0, fhi=7200.0, carrier="original",
@@ -67,10 +67,13 @@ def aud_png(ag, path):
 p = os.path.join(SC, "noise_ag.png"); aud_png(AG, p)
 db = {"original": -24}
 conds = []
+_bar = buildkit.bar(len(COND), "noise")
 for cid, lab, sub, cl in COND:
     conds.append(dict(id=cid, label=lab, sub=sub, cls=cl,
                       file=write_aac(match(RAW[cid], db.get(cid, -20)), f"noise_{cid}"),
-                      **metrics.all_metrics(RAW[cid], xclean, SR, AG, full=True)))
+                      **buildkit.metrics_cached(metrics.all_metrics, RAW[cid], xclean, SR, AG, full=True)))
+    _bar.update()
+_bar.close(); buildkit.save()
 out = {"name": "Ski-slope loss", "snr": SNR, "png": base64.b64encode(open(p,"rb").read()).decode(),
        "conditions": conds}
 json.dump(out, open(os.path.join(SC, "noise_section.json"), "w"))

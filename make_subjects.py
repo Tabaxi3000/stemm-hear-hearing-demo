@@ -12,7 +12,7 @@ SC = "/private/tmp/claude-502/-Users-tabaxitft-Desktop-STEMM-HEAR/02cdbe4e-d460-
 sys.path.insert(0, "/Users/tabaxitft/Desktop/STEMM-HEAR/FILTER BANKS/speech_resynthesis/colab")
 sys.path.append("/Users/tabaxitft/Desktop/STEMM-HEAR/FILTER BANKS/speech_resynthesis/web")   # metrics
 import speech_resynth as sp
-import metrics
+import metrics, buildkit
 SR = 32000                                     # 32 kHz -> 12 kHz filter bank
 FLO, FHI, NB = 100.0, 12000.0, 32
 FC = sp.band_centres(sp.band_edges(FLO, FHI, NB, "greenwood"))
@@ -96,6 +96,7 @@ def png_b64(p): return base64.b64encode(open(p,"rb").read()).decode()
 def diotic(mono): return np.stack([mono, mono], 1)
 
 out = {"subjects": []}
+_bar = buildkit.bar(len(SUBJECTS) * 4, "subjects")     # 4 conditions each
 for sub in SUBJECTS:
     x65 = SPEECH if sub["src"] == "speech" else MUSIC
     lraw, rraw = render_ear(x65, sub["aL"]), render_ear(x65, sub["aR"])
@@ -112,7 +113,8 @@ for sub in SUBJECTS:
     agp = os.path.join(SC, f"subj_{sub['id']}_ag.png"); subject_ag_png(sub, agp)
     iop = os.path.join(SC, f"subj_{sub['id']}_io.png"); subject_io_png(sub, iop)
     def _cond(c, l, s, cl, a):
-        m = metrics.poorer_ear_metrics(a, x65, SR, sub["aL"], sub["aR"], full=True, music=(sub["src"]=="music"))   # one call per condition
+        m = buildkit.poorer_cached(metrics.poorer_ear_metrics, a, x65, SR, sub["aL"], sub["aR"],
+                                   full=True, music=(sub["src"] == "music")); _bar.update()
         d = dict(id=c, label=l, sub=s, cls=cl, file=write_aac(a, f"subj_{sub['id']}_{c}"),
                  sii=m["sii"], stoi=m["stoi"], err=m["err"])
         for _k in ("haspi", "hasqi", "haaqi"):
@@ -124,6 +126,7 @@ for sub in SUBJECTS:
         png=png_b64(agp), io=png_b64(iop),
         conditions=[_cond(*t) for t in conds]))
     print(f"{sub['name']:12s} rendered | aided R-L level diff {ild:+.1f} dB")
+_bar.close(); buildkit.save()
 
 # ---- ILD / localization demo: a panned talker, independent vs linked compression -----
 agSym = {250:30,500:35,1000:45,2000:55,4000:60,8000:60}         # symmetric, so only the ILD moves

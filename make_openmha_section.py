@@ -14,7 +14,7 @@ PROJ = "/Users/tabaxitft/Desktop/STEMM-HEAR/FILTER BANKS/speech_resynthesis"
 OMHA = os.path.join(PROJ, "openmha", "out")
 sys.path.insert(0, os.path.join(PROJ, "colab")); sys.path.insert(0, os.path.join(PROJ, "openmha"))
 sys.path.append(os.path.join(PROJ, "web"))
-import speech_resynth as sp, fitting, metrics
+import speech_resynth as sp, fitting, metrics, buildkit
 SR = 16000
 FC = sp.band_centres(sp.band_edges(100.0, 7200.0, 28, "greenwood"))
 COMMON = dict(backend="stft", n_bands=28, flo=100.0, fhi=7200.0, carrier="original",
@@ -73,6 +73,7 @@ COND = [("original","Original","unaided","orig"), ("ours","Ours (Rx)","our presc
         ("camfit","CAMFIT","OpenMHA","cam")]
 
 out = {"audiograms": []}; valdiffs = []
+_bar = buildkit.bar(len(AUDIOGRAMS) * len(COND), "openmha")
 for aid, ag in AUDIOGRAMS.items():
     raw = {"original": x65.copy(), "ours": ours_rx(ag)}
     for rule in ("nal_nl2","dsl_mio","camfit"):
@@ -84,12 +85,14 @@ for aid, ag in AUDIOGRAMS.items():
     clips = {"original": match(raw["original"], -24)}
     for k in ("ours","nal_nl2","dsl_mio","camfit"): clips[k] = match(raw[k], -20)
     p = os.path.join(SC, f"omha_{aid}.png"); aud_png(ag, p)
-    out["audiograms"].append(dict(id=aid, name=NAME[aid], png=png_b64(p),
-        conditions=[dict(id=c, label=l, sub=s, cls=cl,
-                         file=write_aac(clips[c], f"omha_{aid}_{c}"),
-                         **metrics.all_metrics(raw[c], raw['original'], SR, ag, full=True)) for c,l,s,cl in COND]))
+    _conds = []
+    for c, l, s, cl in COND:
+        m = buildkit.metrics_cached(metrics.all_metrics, raw[c], raw['original'], SR, ag, full=True); _bar.update()
+        _conds.append(dict(id=c, label=l, sub=s, cls=cl, file=write_aac(clips[c], f"omha_{aid}_{c}"), **m))
+    out["audiograms"].append(dict(id=aid, name=NAME[aid], png=png_b64(p), conditions=_conds))
     print(f"{aid}: rendered 5 conditions")
 
+_bar.close(); buildkit.save()
 out["validation_db"] = round(float(np.mean(valdiffs)), 1)
 json.dump(out, open(os.path.join(SC, "openmha_section.json"), "w"))
 print(f"wrote openmha_section.json  ({os.path.getsize(os.path.join(SC,'openmha_section.json'))/1e6:.2f} MB) | "

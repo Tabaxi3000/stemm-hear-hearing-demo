@@ -12,7 +12,7 @@ SC = "/private/tmp/claude-502/-Users-tabaxitft-Desktop-STEMM-HEAR/02cdbe4e-d460-
 sys.path.insert(0, "/Users/tabaxitft/Desktop/STEMM-HEAR/FILTER BANKS/speech_resynthesis/colab")
 sys.path.append("/Users/tabaxitft/Desktop/STEMM-HEAR/FILTER BANKS/speech_resynthesis/web")   # metrics / stoi_vendor
 import speech_resynth as sp
-import metrics
+import metrics, buildkit
 
 SR = 32000                                     # 32 kHz -> 12 kHz filter bank (Nyquist 16 kHz)
 
@@ -149,15 +149,18 @@ def png_b64(path):
     return base64.b64encode(open(path, "rb").read()).decode()
 
 assets = {"original_file": write_aac(clips["original"], "shape_original"), "audiograms": []}
+_bar = buildkit.bar(len(AUDIOGRAMS) * (len(CONDITIONS) + 1), "shapes")
 for A in AUDIOGRAMS:
     pth = os.path.join(SC, f"ag_{A['id']}.png"); audiogram_png(A["ag"], pth)
     cpth = os.path.join(SC, f"comp_{A['id']}.png"); comp_png(A["ag"], cpth)
-    conds = [dict(id=cid, label=lbl, file=write_aac(clips[f"{A['id']}__{cid}"], f"shape_{A['id']}_{cid}"),
-                  **metrics.all_metrics(raw[f"{A['id']}__{cid}"], x65, SR, A["ag"], full=True))
-             for cid, lbl, _ in CONDITIONS]
+    conds = []
+    for cid, lbl, _ in CONDITIONS:
+        m = buildkit.metrics_cached(metrics.all_metrics, raw[f"{A['id']}__{cid}"], x65, SR, A["ag"], full=True); _bar.update()
+        conds.append(dict(id=cid, label=lbl, file=write_aac(clips[f"{A['id']}__{cid}"], f"shape_{A['id']}_{cid}"), **m))
+    orig = buildkit.metrics_cached(metrics.all_metrics, x65, x65, SR, A["ag"], full=True); _bar.update()
     assets["audiograms"].append(dict(id=A["id"], name=A["name"], blurb=A["blurb"],
-                                     png=png_b64(pth), comp=png_b64(cpth),
-                                     orig=metrics.all_metrics(x65, x65, SR, A["ag"], full=True), conditions=conds))
+                                     png=png_b64(pth), comp=png_b64(cpth), orig=orig, conditions=conds))
+_bar.close(); buildkit.save()
 
 json.dump(assets, open(os.path.join(SC, "assets.json"), "w"))
 print("wrote assets.json  %.3f MB (files in web/audio)" % (os.path.getsize(os.path.join(SC, "assets.json")) / 1e6))
