@@ -245,6 +245,7 @@
 
   // ---- file load: decode -> mono 32 kHz ----------------------------------------------
   function loadFile(file) {
+    input = null; $("run").disabled = true;
     status("decoding…");
     var reader = new FileReader();
     reader.onload = function () {

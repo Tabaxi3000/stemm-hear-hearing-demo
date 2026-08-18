@@ -432,8 +432,8 @@ TOOL_HTML = f"""
       </details>
       <div class="tool-grid">
         <div class="panel">
-          <label class="filebtn">Choose audio<input type="file" id="tf" accept="audio/*"></label>
-          <span id="fname" class="fname">no file chosen yet</span><span id="fnote" class="fnote"></span>
+          <label class="filebtn">Choose audio (required)<input type="file" id="tf" accept="audio/*"></label>
+          <span id="fname" class="fname">no WAV or MP3 selected</span><span id="fnote" class="fnote"></span>
           <div class="presets">hearing-loss preset:
             <button data-preset="normal">normal</button><button data-preset="sloping">sloping</button>
             <button data-preset="flat">flat 40</button><button data-preset="ski">ski-slope</button>
@@ -491,9 +491,9 @@ TOOL_HTML = f"""
             <label class="chk"><input type="checkbox" id="losssim"> Hear it as the patient does
               <span class="chknote">&mdash; through a simulation of the loss, so aided vs unaided shows the benefit</span></label>
           </details>
-          <button id="run" class="runbtn">Process</button>
+          <button id="run" class="runbtn" disabled>Process</button>
           <div id="tprog" class="tprog" hidden><div class="tprog-bar"><i id="tprogfill"></i></div><span id="tprogtxt" class="tprog-txt"></span></div>
-          <span id="tstatus" class="status">Step 1: click “Choose audio” above to upload a file</span>
+          <span id="tstatus" class="status">Audio file required — the audiogram describes hearing loss; it is not audio</span>
           <div id="engine" class="engine">engine: real Python module (Pyodide) &mdash; boots on first use</div>
         </div>
         <div class="panel">
