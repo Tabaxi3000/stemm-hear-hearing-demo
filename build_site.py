@@ -416,6 +416,8 @@ TOOL_HTML = f"""
         <p><b>Listening:</b> use headphones in their normal <b>stereo</b> mode and leave any accessibility
         “mono audio” setting off. <b>One ear / same both sides</b> sends the same mono result to both headphone
         channels. <b>Two ears / left-right</b> fits the two audiograms independently and must remain stereo.
+        After a two-ear run, the <b>headphone playback</b> buttons can audition both ears, the left ear alone,
+        or the right ear alone; an individual-ear choice silences the opposite headphone cup.
         Begin at a low, comfortable volume; this research demo is not a calibrated clinical output.</p>
         <p><b>Thirty seconds:</b> this is a browser-processing cap, not a required test duration. A longer file
         may be selected, but the tool uses only its first 30 seconds, downmixes it to mono before fitting, and
@@ -514,6 +516,11 @@ TOOL_HTML = f"""
               min="0" max="1000" value="0" aria-label="Seek"></div>
             <span class="time" id="ttime"><b>0:00</b> / 0:00</span>
           </div>
+          <div class="earmode" id="listenEars" hidden><span class="earmode-lbl">headphone playback:</span>
+            <button type="button" class="segbtn on" data-monitor="both">both ears</button>
+            <button type="button" class="segbtn" data-monitor="left">left only</button>
+            <button type="button" class="segbtn" data-monitor="right">right only</button>
+            <span class="chknote">selected ear stays in its own cup; the other cup is silent</span></div>
           <p class="cue"><span class="dot"></span><b class="cur" id="tcur">Original</b><span class="hint">&mdash;
             process a file, then switch to compare</span></p>
           <div id="tverdict" class="verdict" style="display:none"></div>

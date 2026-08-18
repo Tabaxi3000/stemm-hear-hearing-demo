@@ -9,7 +9,7 @@
   var agR = ag.slice();                                // right ear (used only in binaural mode)
   var binauralOn = false, binaEverOn = false;
   var SR = 32000, CAP = 30;                            // process up to 30 s (each fit is a full DSP pass; time scales with length)
-  var input = null, fileName = "", urls = {}, clips = {};
+  var input = null, fileName = "", urls = {}, playUrls = {}, clips = {}, monitorMode = "both";
   var KEYS = ["original", "static", "wdrc", "rx", "nal", "dsl", "cam", "per"], specCache = {};
   var LABELS = ["Original", "Static", "WDRC", "Rx", "NAL-NL2", "DSL", "CAM2", "Personalized"];
   var pyodide = null, pyReady = false, pyBooting = false, pyFailed = false;
@@ -88,7 +88,7 @@
     var ak = KEYS[active]; if (clips[ak]) plot(specCache[ak] || (specCache[ak] = ltas(chanL(clips[ak]))), teal, false);
   }
   function chanL(c) { return c && c.l ? c.l : c; }        // mono Float32Array, or the left channel of a stereo clip
-  function toWav(clip, sr) {
+  function toWav(clip, sr, monitor) {
     var stereo = !!(clip && clip.l), l = chanL(clip), r = stereo ? clip.r : null;
     var ch = stereo ? 2 : 1, n = l.length, bytes = n * ch * 2;
     var buf = new ArrayBuffer(44 + bytes), dv = new DataView(buf), i;
@@ -98,7 +98,9 @@
     dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, ch, true);
     dv.setUint32(24, sr, true); dv.setUint32(28, sr * ch * 2, true); dv.setUint16(32, ch * 2, true);
     dv.setUint16(34, 16, true); s(36, "data"); dv.setUint32(40, bytes, true);
-    for (i = 0; i < n; i++) { var o = 44 + i * ch * 2; w16(o, l[i]); if (stereo) w16(o + 2, r[i]); }
+    for (i = 0; i < n; i++) { var o = 44 + i * ch * 2;
+      w16(o, stereo && monitor === "right" ? 0 : l[i]);
+      if (stereo) w16(o + 2, monitor === "left" ? 0 : r[i]); }
     return new Blob([buf], { type: "audio/wav" });
   }
   function normalizeStereo(c, targetDb) {                 // match by JOINT rms so the interaural difference survives
@@ -285,14 +287,31 @@
     drawSpec();
   }
 
-  function applyClips() {                                 // wire the (mono or stereo) clips{} to chips / player / downloads
+  function refreshPlayerSources() {                       // playback monitor may silence one headphone cup
+    KEYS.forEach(function (k, i) {
+      if (!clips[k]) return;
+      if (playUrls[k]) URL.revokeObjectURL(playUrls[k]);
+      playUrls[k] = URL.createObjectURL(toWav(clips[k], SR, monitorMode)); pool[i].src = playUrls[k];
+    });
+  }
+  function applyClips() {                                 // wire full clips to downloads; monitored clips to player
     KEYS.forEach(function (k, i) {
       var chip = document.querySelector('#tchips .chip[data-i="' + i + '"]'), dl = $("dl_" + k);
       if (!clips[k]) { if (chip) chip.disabled = true; if (dl) dl.style.display = "none"; return; }
       if (urls[k]) URL.revokeObjectURL(urls[k]);
-      urls[k] = URL.createObjectURL(toWav(clips[k], SR)); pool[i].src = urls[k]; if (chip) chip.disabled = false;
+      urls[k] = URL.createObjectURL(toWav(clips[k], SR)); if (chip) chip.disabled = false;
       if (dl) { dl.href = urls[k]; dl.download = (fileName.replace(/\.[^.]+$/, "") || "clip") + "_" + k + ".wav"; dl.style.display = ""; }
     });
+    refreshPlayerSources();
+  }
+  function setMonitor(mode) {
+    monitorMode = mode;
+    document.querySelectorAll("#listenEars [data-monitor]").forEach(function (b) { b.classList.toggle("on", b.dataset.monitor === mode); });
+    if (!clips.original || !clips.original.l) return;
+    var t = pool[active] ? pool[active].currentTime : 0, was = on;
+    pool.forEach(function (a) { a.pause(); }); setOn(false); refreshPlayerSources();
+    pool.forEach(function (a) { if (a.src) a.currentTime = Math.min(t, dur || t); });
+    if (was && pool[active]) { pool[active].play(); setOn(true); }
   }
   function finishUp(rows, verdict, msg) {
     progHide();
@@ -344,6 +363,7 @@
         var mn = function (a, b) { return a && b ? a.map(function (v, i) { return Math.min(v, b[i]); }) : null; };
         var mx = function (a, b) { return a && b ? a.map(function (v, i) { return Math.max(v, b[i]); }) : null; };
         applyClips();
+        if ($("listenEars")) $("listenEars").hidden = false;
         var pSII = mn(L.sii, R.sii), pSTOI = mn(L.stoi, R.stoi), pERR = mx(L.err, R.err);
         storeFitMetrics(pSII, pSTOI, pERR);                // poorer-ear metrics per fit, for the blind CSV
         var brows = [                                      // show both ears explicitly; summarize only in the verdict/CSV
@@ -357,6 +377,8 @@
         return;
       }
       var r = L;                                           // ---- mono ----
+      monitorMode = "both";
+      if ($("listenEars")) $("listenEars").hidden = true;
       if (common) {
         var arrs = []; KEYS.forEach(function (k) { if (r[k]) arrs.push(r[k]); });
         var g = 0.92 / (peakOf(arrs) + 1e-9);
@@ -481,6 +503,8 @@
       b.addEventListener("click", function () { preset(b.dataset.preset); }); });
     if ($("earOne")) $("earOne").addEventListener("click", function () { setEarMode(false); });
     if ($("earTwo")) $("earTwo").addEventListener("click", function () { setEarMode(true); });
+    document.querySelectorAll("#listenEars [data-monitor]").forEach(function (b) {
+      b.addEventListener("click", function () { setMonitor(b.dataset.monitor); }); });
     if ($("copyLR")) $("copyLR").addEventListener("click", function () { agR = ag.slice(); buildSliders(); drawAg(); });
     if ($("copyRL")) $("copyRL").addEventListener("click", function () { ag = agR.slice(); buildSliders(); drawAg(); });
     $("run").addEventListener("click", process);
