@@ -137,7 +137,7 @@ def subject_section(s):
                   f'src="data:image/png;base64,{s["png"]}"><figcaption>{s.get("figcap","")}</figcaption></figure>')
     srow = ""
     if s["conditions"] and "sii" in s["conditions"][0]:   # binaural subjects carry poorer-ear metrics
-        srow = metric_rows([(c["label"], c) for c in s["conditions"]], "ANSI SII, poorer ear (0–1)")
+        srow = metric_rows([(c["label"], c) for c in s["conditions"]], "ANSI SII — minimum of left/right (0–1)")
     return f"""
     <section class="specimen subject" id="st-{s['id']}" data-player>
       <div class="sp-head"><span class="sp-num sub">&#9670;</span>
@@ -186,7 +186,7 @@ def subj_omha_section(a):                               # binaural subject: ours
                      f'{html.escape(c["label"])}<em>{html.escape(c["sub"])}</em></button>')
     ph = ' <span class="badge">placeholder music</span>' if a.get("placeholder") else ""
     hint = "&mdash; headphones: each ear is fit on its own audiogram; loudness-matched"
-    srow = metric_rows([(c["label"], c) for c in a["conditions"]], "ANSI SII, poorer ear (0–1)")
+    srow = metric_rows([(c["label"], c) for c in a["conditions"]], "ANSI SII — minimum of left/right (0–1)")
     return f"""
     <section class="specimen subject" id="st-somha-{a['id']}" data-player>
       <div class="sp-head"><span class="sp-num sub">&#9670;</span>
@@ -411,6 +411,23 @@ TOOL_HTML = f"""
         from there. SII numbers are the <b>official ANSI S3.5</b> index. (The gallery sections above also
         report <b>HASPI</b>, a hearing-aid-specific metric; it runs an auditory model, too heavy for the
         live in-browser tool, so here you get the fast SII&nbsp;/&nbsp;STOI.)</p>
+      <details class="advanced listen-guide">
+        <summary>Listening setup, 30-second limit, and metric definitions</summary>
+        <p><b>Listening:</b> use headphones in their normal <b>stereo</b> mode and leave any accessibility
+        “mono audio” setting off. <b>One ear / same both sides</b> sends the same mono result to both headphone
+        channels. <b>Two ears / left-right</b> fits the two audiograms independently and must remain stereo.
+        Begin at a low, comfortable volume; this research demo is not a calibrated clinical output.</p>
+        <p><b>Thirty seconds:</b> this is a browser-processing cap, not a required test duration. A longer file
+        may be selected, but the tool uses only its first 30 seconds, downmixes it to mono before fitting, and
+        resamples it to 32&nbsp;kHz. Shorter files are used in full.</p>
+        <p><b>ANSI SII</b> is calculated from the waveform and audiogram with the ANSI S3.5 method; it is separate
+        from an equipment-measured unaided SII. <b>STOI</b> is a waveform comparison between the clean and
+        processed recordings (higher is better); it does not itself use the audiogram. In two-ear mode the site
+        reports STOI for each ear and summarizes with <b>min(left,right)</b>. <b>NAL target error</b> is the RMS,
+        in dB, between achieved insertion gain and the 65-dB NAL-NL2 reference across 18 one-third-octave bands
+        (0&nbsp;dB = exact match; lower is closer). In two-ear mode the summary is <b>max(left,right)</b>. Our
+        NAL-NL2 curve is a published approximation, so use official equipment targets when available.</p>
+      </details>
       <div class="tool-grid">
         <div class="panel">
           <label class="filebtn">Choose audio<input type="file" id="tf" accept="audio/*"></label>

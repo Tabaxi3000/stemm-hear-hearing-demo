@@ -346,11 +346,11 @@
         applyClips();
         var pSII = mn(L.sii, R.sii), pSTOI = mn(L.stoi, R.stoi), pERR = mx(L.err, R.err);
         storeFitMetrics(pSII, pSTOI, pERR);                // poorer-ear metrics per fit, for the blind CSV
-        var brows = [                                      // show BOTH ears' SII; STOI/dB on the poorer ear
+        var brows = [                                      // show both ears explicitly; summarize only in the verdict/CSV
           { label: "ANSI SII &mdash; left ear:", vals: L.sii, fmt: FMT2 },
           { label: "ANSI SII &mdash; right ear:", vals: R.sii, fmt: FMT2 },
-          { label: "STOI (poorer ear):", vals: pSTOI, fmt: FMT2 },
-          { label: "dB to NAL-NL2 ref (poorer ear):", vals: pERR, fmt: FMT0 }
+          { label: "STOI &mdash; min(left, right):", vals: pSTOI, fmt: FMT2 },
+          { label: "NAL target error &mdash; max(left, right), dB RMS:", vals: pERR, fmt: FMT0 }
         ];
         finishUp(brows, makeVerdict(pSII, pSTOI, pERR),
                  "done — binaural, each ear fit on its own audiogram (headphones); SII shown per ear");
@@ -369,8 +369,8 @@
       storeFitMetrics(r.sii, r.stoi, r.err);               // per-fit metrics, for the blind CSV
       var mrows = r.sii ? [
         { label: "ANSI SII (0–1):", vals: r.sii, fmt: FMT2 },
-        { label: "STOI (0–1):", vals: r.stoi, fmt: FMT2 },
-        { label: "dB to NAL-NL2 ref:", vals: r.err, fmt: FMT0 }
+        { label: "STOI — clean vs processed (0–1):", vals: r.stoi, fmt: FMT2 },
+        { label: "NAL target error (dB RMS):", vals: r.err, fmt: FMT0 }
       ] : null;
       finishUp(mrows, makeVerdict(r.sii, r.stoi, r.err),
                r.loss ? "done — heard through the loss (unaided degraded; aided restores it)" : r.levels ? "done — real levels (the aid makes it louder)"
